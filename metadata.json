@@ -1,0 +1,6 @@
+{
+  "name": "SoftFlow - Gestor de Demandas & Automações",
+  "description": "Gerenciador ágil de projetos e demandas estilo Monday.com com automações de fluxo de trabalho inteligentes, painéis personalizados e integração com GitHub, Claude e Codex.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
