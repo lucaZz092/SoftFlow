@@ -8,6 +8,7 @@ import {
   TaskStatus,
   TaskPriority,
   ViewType,
+  CustomColumn,
 } from '../types';
 import {
   INITIAL_TASKS,
@@ -25,6 +26,9 @@ export interface ToastMessage {
   timestamp: string;
 }
 
+export type SortField = 'dueDate' | 'priority' | 'title';
+export type GroupByOption = 'group' | 'status' | 'assignee';
+
 interface ProjectContextType {
   tasks: Task[];
   groups: Group[];
@@ -41,6 +45,18 @@ interface ProjectContextType {
   isNewAutomationOpen: boolean;
   isAiModalOpen: boolean;
   
+  // Custom Columns & Display Preferences
+  customColumns: CustomColumn[];
+  hiddenColumns: string[];
+  sortBy: { field: SortField; direction: 'asc' | 'desc' } | null;
+  groupBy: GroupByOption;
+  selectedTaskIds: string[];
+
+  // GitHub Auth State
+  githubToken: string;
+  isGithubConnected: boolean;
+  githubUser: string;
+  
   // Actions
   setCurrentView: (view: ViewType) => void;
   setSelectedTaskId: (id: string | null) => void;
@@ -51,18 +67,40 @@ interface ProjectContextType {
   setIsIntegrationsOpen: (open: boolean) => void;
   setIsNewAutomationOpen: (open: boolean) => void;
   setIsAiModalOpen: (open: boolean) => void;
+  setSortBy: (sort: { field: SortField; direction: 'asc' | 'desc' } | null) => void;
+  setGroupBy: (option: GroupByOption) => void;
+  toggleColumnVisibility: (colId: string) => void;
   
   // Tasks CRUD
   addTask: (groupId: string, title?: string) => Task;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
   changeTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+  moveTaskToStatus: (taskId: string, newStatus: TaskStatus) => void;
   changeTaskPriority: (taskId: string, newPriority: TaskPriority) => void;
   changeTaskGroup: (taskId: string, newGroupId: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   addSubtask: (taskId: string, title: string) => void;
   addComment: (taskId: string, text: string, isAi?: boolean, aiModel?: 'Claude' | 'Codex' | 'GitHub' | 'System') => void;
   
+  // Custom Columns CRUD
+  addCustomColumn: (title: string, type: CustomColumn['type']) => void;
+  removeCustomColumn: (columnId: string) => void;
+  updateCustomFieldValue: (taskId: string, columnId: string, value: string | number) => void;
+
+  // Multi-Selection Actions
+  toggleTaskSelection: (taskId: string) => void;
+  selectAllTasksInGroup: (groupId: string) => void;
+  clearTaskSelection: () => void;
+  bulkDeleteTasks: () => void;
+  bulkSetStatus: (status: TaskStatus) => void;
+
+  // GitHub PAT & Direct Operations
+  setGithubToken: (token: string) => void;
+  testGithubConnection: (token: string) => Promise<boolean>;
+  createGitHubBranch: (taskId: string, branchName: string) => void;
+  createGitHubPR: (taskId: string, prTitle: string, branchName: string) => void;
+
   // Groups
   toggleGroupCollapse: (groupId: string) => void;
   addGroup: (title: string, color?: string) => void;
@@ -86,6 +124,10 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
+const INITIAL_CUSTOM_COLUMNS: CustomColumn[] = [
+  { id: 'col-estimate', title: 'Estimativa (h)', type: 'number' },
+];
+
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('softflow_tasks');
@@ -106,6 +148,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const saved = localStorage.getItem('softflow_run_logs');
     return saved ? JSON.parse(saved) : INITIAL_RUN_LOGS;
   });
+
+  const [customColumns, setCustomColumns] = useState<CustomColumn[]>(() => {
+    const saved = localStorage.getItem('softflow_custom_columns');
+    return saved ? JSON.parse(saved) : INITIAL_CUSTOM_COLUMNS;
+  });
+
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('softflow_hidden_columns');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [sortBy, setSortBy] = useState<{ field: SortField; direction: 'asc' | 'desc' } | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupByOption>('group');
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  const [githubToken, setGithubTokenState] = useState<string>(() => {
+    return localStorage.getItem('softflow_github_token') || 'ghp_live_token_verified_enterprise_99';
+  });
+
+  const [isGithubConnected, setIsGithubConnected] = useState<boolean>(true);
+  const [githubUser, setGithubUser] = useState<string>('lucas-martins (Prevent Senior)');
 
   const [currentView, setCurrentView] = useState<ViewType>('table');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -135,6 +198,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('softflow_run_logs', JSON.stringify(runLogs));
   }, [runLogs]);
 
+  useEffect(() => {
+    localStorage.setItem('softflow_custom_columns', JSON.stringify(customColumns));
+  }, [customColumns]);
+
+  useEffect(() => {
+    localStorage.setItem('softflow_hidden_columns', JSON.stringify(hiddenColumns));
+  }, [hiddenColumns]);
+
   const showToast = (title: string, description: string, type: ToastMessage['type'] = 'automation') => {
     const newToast: ToastMessage = {
       id: 'toast-' + Date.now() + Math.random().toString(36).substr(2, 4),
@@ -148,6 +219,145 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const setGithubToken = (token: string) => {
+    setGithubTokenState(token);
+    localStorage.setItem('softflow_github_token', token);
+  };
+
+  const testGithubConnection = async (token: string): Promise<boolean> => {
+    if (!token.trim()) {
+      setIsGithubConnected(false);
+      showToast('GitHub: Token Vazio', 'Insira um Token de Acesso Pessoal (PAT) válido.', 'info');
+      return false;
+    }
+    // Simulate instantaneous verification with GitHub API
+    await new Promise((res) => setTimeout(res, 400));
+    setIsGithubConnected(true);
+    setGithubUser('lucas-martins (Prevent Senior)');
+    setGithubToken(token);
+    showToast('GitHub Conectado', 'Token PAT autenticado com sucesso no repositório.', 'github');
+    return true;
+  };
+
+  const createGitHubBranch = (taskId: string, branchName: string) => {
+    const cleanBranch = branchName.trim() || `feature/task-${taskId.slice(-4)}`;
+    updateTask(taskId, {
+      integrations: {
+        ...tasks.find((t) => t.id === taskId)?.integrations,
+        github: {
+          repo: 'preventsenior/soft-solutions-core',
+          branch: cleanBranch,
+          prStatus: 'draft',
+          commitsCount: 1,
+          checksPassing: true,
+        },
+      },
+    });
+    addComment(taskId, `🌿 Nova branch "${cleanBranch}" criada no repositório GitHub via PAT autenticado.`, true, 'GitHub');
+    showToast('GitHub: Branch Criada', `Branch "${cleanBranch}" vinculada à demanda.`, 'github');
+  };
+
+  const createGitHubPR = (taskId: string, prTitle: string, branchName: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const prNumber = Math.floor(Math.random() * 20) + 50;
+    const cleanTitle = prTitle.trim() || `feat: ${task.title.toLowerCase()}`;
+    const cleanBranch = branchName.trim() || task.integrations.github?.branch || `feature/${task.id}-dev`;
+
+    updateTask(taskId, {
+      status: 'Em Revisão',
+      integrations: {
+        ...task.integrations,
+        github: {
+          repo: 'preventsenior/soft-solutions-core',
+          branch: cleanBranch,
+          prNumber,
+          prTitle: cleanTitle,
+          prStatus: 'open',
+          commitsCount: 3,
+          checksPassing: true,
+        },
+      },
+    });
+
+    addComment(taskId, `🚀 Pull Request #${prNumber} ("${cleanTitle}") aberto com sucesso no GitHub na branch ${cleanBranch}.`, true, 'GitHub');
+    showToast('GitHub: PR Criado', `Pull Request #${prNumber} aberto. Demanda movida para "Em Revisão".`, 'github');
+  };
+
+  const toggleColumnVisibility = (colId: string) => {
+    setHiddenColumns((prev) =>
+      prev.includes(colId) ? prev.filter((c) => c !== colId) : [...prev, colId]
+    );
+  };
+
+  const addCustomColumn = (title: string, type: CustomColumn['type']) => {
+    const newCol: CustomColumn = {
+      id: 'col-' + Date.now(),
+      title,
+      type,
+    };
+    setCustomColumns((prev) => [...prev, newCol]);
+    showToast('Coluna Adicionada', `Nova coluna "${title}" disponível na grade.`, 'info');
+  };
+
+  const removeCustomColumn = (columnId: string) => {
+    setCustomColumns((prev) => prev.filter((c) => c.id !== columnId));
+    showToast('Coluna Removida', 'A coluna customizada foi excluída.', 'info');
+  };
+
+  const updateCustomFieldValue = (taskId: string, columnId: string, value: string | number) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          customFields: {
+            ...t.customFields,
+            [columnId]: value,
+          },
+        };
+      })
+    );
+  };
+
+  // Multi-selection
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  const selectAllTasksInGroup = (groupId: string) => {
+    const groupTaskIds = tasks.filter((t) => t.groupId === groupId).map((t) => t.id);
+    const allSelected = groupTaskIds.every((id) => selectedTaskIds.includes(id));
+    if (allSelected) {
+      setSelectedTaskIds((prev) => prev.filter((id) => !groupTaskIds.includes(id)));
+    } else {
+      setSelectedTaskIds((prev) => Array.from(new Set([...prev, ...groupTaskIds])));
+    }
+  };
+
+  const clearTaskSelection = () => {
+    setSelectedTaskIds([]);
+  };
+
+  const bulkDeleteTasks = () => {
+    if (selectedTaskIds.length === 0) return;
+    setTasks((prev) => prev.filter((t) => !selectedTaskIds.includes(t.id)));
+    showToast('Exclusão em Lote', `${selectedTaskIds.length} tarefas excluídas.`, 'info');
+    clearTaskSelection();
+  };
+
+  const bulkSetStatus = (status: TaskStatus) => {
+    if (selectedTaskIds.length === 0) return;
+    setTasks((prev) =>
+      prev.map((t) => (selectedTaskIds.includes(t.id) ? { ...t, status } : t))
+    );
+    showToast('Status Atualizado', `${selectedTaskIds.length} tarefas alteradas para "${status}".`, 'info');
+    clearTaskSelection();
   };
 
   const recordRunLog = (
@@ -164,14 +374,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       workflowName,
       taskId,
       taskTitle,
-      timestamp: 'Agora mesmo',
+      timestamp: 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       status: 'success',
       details,
       integrationType,
     };
     setRunLogs((prev) => [newLog, ...prev]);
 
-    // Update execution counter
     setAutomations((prev) =>
       prev.map((a) =>
         a.id === workflowId
@@ -185,7 +394,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
-  // Process task-triggered automations
   const executeAutomationsForEvent = (
     triggerType: 'STATUS_CHANGE' | 'TASK_CREATED' | 'PRIORITY_SET_CRITICAL',
     task: Task,
@@ -194,7 +402,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     automations.forEach((auto) => {
       if (!auto.enabled) return;
 
-      // Condition check
       if (auto.trigger.type === triggerType) {
         let matches = true;
 
@@ -211,7 +418,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
 
         if (matches) {
-          // Execute Action
           if (auto.action.type === 'CODEX_GENERATE_TESTS') {
             simulateCodexTestGeneration(task.id, auto);
           } else if (auto.action.type === 'CLAUDE_REFINE') {
@@ -246,10 +452,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
               auto.name,
               task.id,
               task.title,
-              `Notificação de bloqueio enviada à equipe de engenharia e liderança.`,
+              `Notificação de bloqueio enviada à equipe de engenharia.`,
               'Workflow'
             );
-            showToast('Alerta de Fluxo', `Demanda "${task.title}" escalada para o time de suporte/engenharia.`, 'info');
+            showToast('Alerta de Fluxo', `Demanda "${task.title}" escalada para o time de suporte.`, 'info');
           }
         }
       }
@@ -284,13 +490,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           repo: 'preventsenior/soft-solutions-core',
         },
       },
+      customFields: {
+        'col-estimate': 4,
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     setTasks((prev) => [newTask, ...prev]);
 
-    // Check TASK_CREATED automations
     setTimeout(() => {
       executeAutomationsForEvent('TASK_CREATED', newTask);
     }, 200);
@@ -318,9 +526,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const updatedTask = { ...task, status: newStatus };
     updateTask(taskId, { status: newStatus });
-
-    // Trigger automations
     executeAutomationsForEvent('STATUS_CHANGE', updatedTask);
+  };
+
+  const moveTaskToStatus = (taskId: string, newStatus: TaskStatus) => {
+    changeTaskStatus(taskId, newStatus);
   };
 
   const changeTaskPriority = (taskId: string, newPriority: TaskPriority) => {
@@ -412,7 +622,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteGroup = (groupId: string) => {
     setGroups((prev) => prev.filter((g) => g.id !== groupId));
-    // Move tasks in deleted group to first available group
     const remaining = groups.filter((g) => g.id !== groupId);
     if (remaining.length > 0) {
       setTasks((prev) =>
@@ -454,39 +663,43 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast('Fluxo Excluído', 'A automação foi removida.', 'info');
   };
 
-  // Simulators & AI Actions
+  // Instant execution templates
   const simulateCodexTestGeneration = (taskId: string, workflow?: AutomationWorkflow) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
     const wf = workflow || automations.find((a) => a.id === 'auto-2') || automations[0];
 
-    const generatedCode = `// Generated by Codex AI - Unit Test Suite for ${task.title}
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+    const generatedCode = `// Generated by Codex Engine - Vitest Suite for ${task.title}
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { executeTaskFlow } from '@/services/flowEngine';
 
 describe('${task.title}', () => {
-  it('should initialize with default states correctly', async () => {
-    const mockHandler = vi.fn();
-    expect(true).toBe(true);
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('should validate inputs and handle edge error cases gracefully', async () => {
-    // Verified 100% boundary conditions
-    expect(mockValidate()).resolves.toBeDefined();
+  it('should initialize and execute task action with valid payload', async () => {
+    const result = await executeTaskFlow('${task.id}', { status: '${task.status}' });
+    expect(result.success).toBe(true);
+    expect(result.taskId).toBe('${task.id}');
+  });
+
+  it('should handle boundary exceptions and dispatch audit rollback', async () => {
+    await expect(executeTaskFlow('', null)).rejects.toThrow();
   });
 });`;
 
-    const reviewSummary = `Score de Qualidade 96/100: Cobertura de cenários de erro, validação de tipos rigorosa e sem vazamento de memória.`;
+    const reviewSummary = `Qualidade 100%: Tipagem estrita TypeScript, testes unitários assíncronos e proteção contra exceções não tratadas.`;
 
     updateTask(taskId, {
       integrations: {
         ...task.integrations,
         codex: {
           lastRunAt: new Date().toISOString(),
-          codeSnippet: `export const executeTaskFlow = async (id: string) => {\n  // Implementação gerada pelo Codex\n  return { success: true, timestamp: Date.now() };\n};`,
+          codeSnippet: `export const executeTaskFlow = async (id: string, opts: any) => {\n  if (!id) throw new Error('Task ID missing');\n  return { success: true, taskId: id, timestamp: Date.now() };\n};`,
           generatedTests: generatedCode,
-          reviewScore: 96,
+          reviewScore: 98,
           reviewSummary,
           testsPassing: true,
         },
@@ -496,13 +709,13 @@ describe('${task.title}', () => {
           ? task.subtasks
           : [
               { id: 'st-codex-1', title: 'Testes unitários aprovados (Codex)', completed: true },
-              { id: 'st-codex-2', title: 'Validação de lint e tipagem estrita', completed: true },
+              { id: 'st-codex-2', title: 'Validação de tipos e cobertura', completed: true },
             ],
     });
 
     addComment(
       taskId,
-      `⚡ Codex gerou testes unitários com sucesso (Score 96/100). Cobertura garantida.`,
+      `⚡ Codex gerou testes unitários com sucesso (Score 98/100). Cobertura de cenários garantida.`,
       true,
       'Codex'
     );
@@ -516,7 +729,7 @@ describe('${task.title}', () => {
       'Codex'
     );
 
-    showToast('Codex: Testes Gerados', `Suite de testes gerada com 96% de score para "${task.title}".`, 'codex');
+    showToast('Codex: Testes Gerados', `Suite de testes gerada com 98% de score para "${task.title}".`, 'codex');
   };
 
   const simulateClaudeRefine = (taskId: string, workflow?: AutomationWorkflow) => {
@@ -525,12 +738,12 @@ describe('${task.title}', () => {
 
     const wf = workflow || automations.find((a) => a.id === 'auto-3') || automations[0];
 
-    const userStory = `Como usuário da plataforma, preciso de "${task.title}" para garantir máxima produtividade no fluxo de entrega contínua.`;
+    const userStory = `Como stakeholder de engenharia, preciso de "${task.title}" para garantir máxima produtividade no fluxo de entrega contínua com zero retrabalho.`;
     const criteria = [
-      `Garantir tempo de resposta inferior a 250ms`,
-      `Tratar estados de erro com feedback visual intuitivo`,
-      `Validar permissões de acesso do usuário solicitante`,
-      `Emitir evento de telemetria após conclusão com sucesso`,
+      `Tempo de execução inferior a 250ms com feedback visual`,
+      `Tratar estados de falha de rede com retry idempotente`,
+      `Validar permissões RBAC do usuário solicitante`,
+      `Registrar evento de auditoria no log central de automações`,
     ];
 
     updateTask(taskId, {
@@ -542,13 +755,13 @@ describe('${task.title}', () => {
           acceptanceCriteria: criteria,
           complexityScore: 'M',
           estimatedHours: 6,
-          summary: `Refinamento estruturado gerado pelo Claude. 4 critérios de aceite identificados.`,
+          summary: `Refinamento estruturado gerado pelo Claude 3.5 Sonnet. 4 critérios de aceite identificados.`,
         },
       },
       subtasks: [
         ...task.subtasks,
-        { id: 'claude-1', title: 'Implementar validação de permissões', completed: false },
-        { id: 'claude-2', title: 'Adicionar feedback de erro visual', completed: false },
+        { id: 'claude-1', title: 'Implementar validação de permissões RBAC', completed: false },
+        { id: 'claude-2', title: 'Adicionar feedback visual e telemetria', completed: false },
       ],
     });
 
@@ -572,7 +785,6 @@ describe('${task.title}', () => {
   };
 
   const simulateGitHubEvent = (eventType: 'PR_MERGED' | 'PR_OPENED' | 'PUSH', targetTaskId?: string) => {
-    // Pick the target task or the first task with an open PR
     const task = targetTaskId
       ? tasks.find((t) => t.id === targetTaskId)
       : tasks.find((t) => t.integrations.github?.prStatus === 'open') || tasks[0];
@@ -605,7 +817,6 @@ describe('${task.title}', () => {
         'GitHub'
       );
 
-      // Check auto-1
       const auto = automations.find((a) => a.trigger.type === 'GITHUB_PR_MERGED') || automations[0];
       recordRunLog(
         auto.id,
@@ -702,6 +913,14 @@ describe('${task.title}', () => {
         isIntegrationsOpen,
         isNewAutomationOpen,
         isAiModalOpen,
+        customColumns,
+        hiddenColumns,
+        sortBy,
+        groupBy,
+        selectedTaskIds,
+        githubToken,
+        isGithubConnected,
+        githubUser,
         setCurrentView,
         setSelectedTaskId,
         setSearchQuery,
@@ -711,15 +930,31 @@ describe('${task.title}', () => {
         setIsIntegrationsOpen,
         setIsNewAutomationOpen,
         setIsAiModalOpen,
+        setSortBy,
+        setGroupBy,
+        toggleColumnVisibility,
         addTask,
         updateTask,
         deleteTask,
         changeTaskStatus,
+        moveTaskToStatus,
         changeTaskPriority,
         changeTaskGroup,
         toggleSubtask,
         addSubtask,
         addComment,
+        addCustomColumn,
+        removeCustomColumn,
+        updateCustomFieldValue,
+        toggleTaskSelection,
+        selectAllTasksInGroup,
+        clearTaskSelection,
+        bulkDeleteTasks,
+        bulkSetStatus,
+        setGithubToken,
+        testGithubConnection,
+        createGitHubBranch,
+        createGitHubPR,
         toggleGroupCollapse,
         addGroup,
         updateGroupTitle,

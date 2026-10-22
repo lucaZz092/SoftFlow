@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Plus,
   GitBranch,
@@ -17,10 +17,13 @@ export const KanbanView: React.FC = () => {
     filterStatus,
     filterPriority,
     filterAssigneeId,
-    changeTaskStatus,
+    moveTaskToStatus,
     setSelectedTaskId,
     addTask,
   } = useProject();
+
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
   const columns: TaskStatus[] = ['A Fazer', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'];
 
@@ -37,22 +40,50 @@ export const KanbanView: React.FC = () => {
     return true;
   });
 
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData('text/plain', taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colStatus: TaskStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumn !== colStatus) {
+      setDragOverColumn(colStatus);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, colStatus: TaskStatus) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
+    if (taskId) {
+      moveTaskToStatus(taskId, colStatus);
+    }
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
+  };
+
   return (
     <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#12141a] select-none">
       <div className="flex items-start space-x-3.5 h-full min-w-max pb-4">
         {columns.map((colStatus) => {
           const colTasks = filteredTasks.filter((t) => t.status === colStatus);
           const colConfig = STATUS_CONFIG[colStatus];
+          const isOver = dragOverColumn === colStatus;
 
           return (
             <div
               key={colStatus}
-              className="w-76 flex flex-col max-h-full rounded-lg bg-[#161922] border border-[#212633] shadow-xs"
+              onDragOver={(e) => handleDragOver(e, colStatus)}
+              onDragLeave={() => setDragOverColumn(null)}
+              onDrop={(e) => handleDrop(e, colStatus)}
+              className={`w-76 flex flex-col max-h-full rounded-lg bg-[#161922] border transition-all shadow-xs ${
+                isOver ? 'border-[#0073ea] ring-2 ring-[#0073ea]/30 bg-[#191d29]' : 'border-[#212633]'
+              }`}
             >
               {/* Column Header */}
-              <div
-                className="p-3 border-b border-[#212633] flex items-center justify-between"
-              >
+              <div className="p-3 border-b border-[#212633] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span
                     className="w-2.5 h-2.5 rounded-full"
@@ -78,14 +109,20 @@ export const KanbanView: React.FC = () => {
                 {colTasks.map((task) => {
                   const priorityInfo = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG['Média'];
                   const taskGroup = groups.find((g) => g.id === task.groupId);
+                  const isBeingDragged = draggedTaskId === task.id;
 
                   return (
                     <div
                       key={task.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, task.id)}
+                      onDragEnd={() => setDraggedTaskId(null)}
                       onClick={() => setSelectedTaskId(task.id)}
-                      className="p-3 rounded-md bg-[#191d27] hover:bg-[#1e2330] border border-[#252b39] hover:border-[#31394b] transition-all cursor-pointer shadow-xs space-y-2 group"
+                      className={`p-3 rounded-md bg-[#191d27] hover:bg-[#1e2330] border border-[#252b39] hover:border-[#31394b] transition-all cursor-grab active:cursor-grabbing shadow-xs space-y-2 group ${
+                        isBeingDragged ? 'opacity-40 scale-95 border-dashed border-blue-400' : 'opacity-100'
+                      }`}
                     >
-                      {/* Group and Priority metadata */}
+                      {/* Group and Priority */}
                       <div className="flex items-center justify-between text-[11px] text-slate-400">
                         <span className="font-medium text-slate-300 truncate max-w-[140px]">
                           {taskGroup?.title || 'Geral'}
@@ -155,7 +192,7 @@ export const KanbanView: React.FC = () => {
                                 key={st}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  changeTaskStatus(task.id, st);
+                                  moveTaskToStatus(task.id, st);
                                 }}
                                 style={{ backgroundColor: STATUS_CONFIG[st].bg }}
                                 className="w-2.5 h-2.5 rounded-full hover:scale-125 transition-transform cursor-pointer"
@@ -170,8 +207,10 @@ export const KanbanView: React.FC = () => {
                 })}
 
                 {colTasks.length === 0 && (
-                  <div className="p-5 text-center text-xs text-slate-500 border border-dashed border-[#252b39] rounded-md">
-                    Nenhuma tarefa
+                  <div className={`p-5 text-center text-xs text-slate-500 border border-dashed rounded-md transition-colors ${
+                    isOver ? 'border-[#0073ea] bg-[#0073ea]/5 text-[#579bfc]' : 'border-[#252b39]'
+                  }`}>
+                    {isOver ? 'Soltar tarefa aqui' : 'Nenhuma tarefa'}
                   </div>
                 )}
               </div>

@@ -12,6 +12,8 @@ import {
   Check,
   Play,
   CheckCircle2,
+  GitPullRequest,
+  Plus,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { STATUS_CONFIG, PRIORITY_CONFIG, TEAM_MEMBERS } from '../data/mockData';
@@ -31,12 +33,18 @@ export const TaskDetailDrawer: React.FC = () => {
     addComment,
     simulateClaudeRefine,
     simulateCodexTestGeneration,
+    createGitHubBranch,
+    createGitHubPR,
   } = useProject();
 
   const [activeTab, setActiveTab] = useState<'comments' | 'subtasks' | 'github' | 'claude' | 'codex'>('comments');
   const [commentInput, setCommentInput] = useState('');
   const [newSubtaskInput, setNewSubtaskInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
+  
+  // Custom branch / PR inputs
+  const [newBranchInput, setNewBranchInput] = useState('');
+  const [newPrTitleInput, setNewPrTitleInput] = useState('');
 
   if (!selectedTaskId) return null;
 
@@ -66,6 +74,19 @@ export const TaskDetailDrawer: React.FC = () => {
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleCreateBranchAction = () => {
+    const branch = newBranchInput.trim() || `feature/${task.id.slice(-4)}-${task.title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15)}`;
+    createGitHubBranch(task.id, branch);
+    setNewBranchInput('');
+  };
+
+  const handleCreatePRAction = () => {
+    const title = newPrTitleInput.trim() || `feat: ${task.title}`;
+    const branch = task.integrations.github?.branch || `feature/${task.id.slice(-4)}`;
+    createGitHubPR(task.id, title, branch);
+    setNewPrTitleInput('');
   };
 
   return (
@@ -369,7 +390,7 @@ export const TaskDetailDrawer: React.FC = () => {
 
           {/* TAB 3: GitHub Integration */}
           {activeTab === 'github' && (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div className="p-4 rounded-lg bg-[#181b24] border border-purple-500/30 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -409,6 +430,54 @@ export const TaskDetailDrawer: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Working GitHub Actions Bar */}
+              <div className="p-3.5 rounded-lg bg-[#181b24] border border-[#232835] space-y-3">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                  Ações Rápidas no GitHub
+                </span>
+
+                {/* Create Branch */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400">Criar Nova Branch Padronizada:</span>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={newBranchInput}
+                      onChange={(e) => setNewBranchInput(e.target.value)}
+                      placeholder={`feature/${task.id.slice(-4)}-sua-branch`}
+                      className="flex-1 bg-[#1b1f2b] text-slate-200 px-2.5 py-1 rounded border border-[#272e3d] text-xs font-mono"
+                    />
+                    <button
+                      onClick={handleCreateBranchAction}
+                      className="px-3 py-1 bg-[#202533] hover:bg-[#282f40] text-purple-300 rounded font-medium transition-colors cursor-pointer whitespace-nowrap text-xs"
+                    >
+                      Criar Branch
+                    </button>
+                  </div>
+                </div>
+
+                {/* Open PR */}
+                <div className="space-y-1 pt-2 border-t border-[#232835]">
+                  <span className="text-[10px] text-slate-400">Abrir Novo Pull Request:</span>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={newPrTitleInput}
+                      onChange={(e) => setNewPrTitleInput(e.target.value)}
+                      placeholder={`feat: ${task.title}`}
+                      className="flex-1 bg-[#1b1f2b] text-slate-200 px-2.5 py-1 rounded border border-[#272e3d] text-xs"
+                    />
+                    <button
+                      onClick={handleCreatePRAction}
+                      className="px-3 py-1 bg-[#0073ea] hover:bg-blue-600 text-white rounded font-medium transition-colors cursor-pointer whitespace-nowrap text-xs flex items-center space-x-1"
+                    >
+                      <GitPullRequest className="w-3 h-3" />
+                      <span>Abrir PR</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -427,7 +496,7 @@ export const TaskDetailDrawer: React.FC = () => {
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors cursor-pointer text-xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Refinar Demanda</span>
+                  <span>Refinar Demanda Agora</span>
                 </button>
               </div>
 
@@ -485,7 +554,7 @@ export const TaskDetailDrawer: React.FC = () => {
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors cursor-pointer text-xs"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Gerar Testes</span>
+                  <span>Gerar Testes Agora</span>
                 </button>
               </div>
 

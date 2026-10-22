@@ -55,6 +55,12 @@ export interface CodexIntegrationData {
   testsPassing?: boolean;
 }
 
+export interface CustomColumn {
+  id: string;
+  title: string;
+  type: 'text' | 'number' | 'date' | 'link';
+}
+
 export interface Task {
   id: string;
   groupId: string;
@@ -75,6 +81,7 @@ export interface Task {
     claude?: ClaudeIntegrationData;
     codex?: CodexIntegrationData;
   };
+  customFields?: Record<string, string | number>;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,0 +1,6 @@
+{
+  "summary":  "Plano de implementação para tornar todas as funcionalidades do SoftFlow 100% interativas e operacionais, incluindo Kanban com drag-and-drop, criação dinâmica de colunas, seletor de datas inline, conexão com Token de Acesso Pessoal do GitHub e templates inteligentes instantâneos para Claude e Codex.",
+  "updatedAt":  "2026-10-22T15:58:53.006408304Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

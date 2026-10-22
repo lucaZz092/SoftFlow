@@ -10,9 +10,10 @@ import {
   Layers,
   GitPullRequest,
   CheckCircle2,
-  X
+  X,
+  Check
 } from 'lucide-react';
-import { useProject } from '../context/ProjectContext';
+import { useProject, SortField, GroupByOption } from '../context/ProjectContext';
 import { TEAM_MEMBERS } from '../data/mockData';
 
 export const BoardToolbar: React.FC = () => {
@@ -28,10 +29,19 @@ export const BoardToolbar: React.FC = () => {
     filterAssigneeId,
     setFilterAssigneeId,
     simulateGitHubEvent,
+    sortBy,
+    setSortBy,
+    hiddenColumns,
+    toggleColumnVisibility,
+    groupBy,
+    setGroupBy,
   } = useProject();
 
   const [showPersonDropdown, setShowPersonDropdown] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [showHideDropdown, setShowHideDropdown] = useState(false);
+  const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [showSimulateDropdown, setShowSimulateDropdown] = useState(false);
 
   const handleCreateTask = () => {
@@ -39,14 +49,24 @@ export const BoardToolbar: React.FC = () => {
     addTask(targetGroup.id, 'Nova Tarefa');
   };
 
-  const hasActiveFilters = Boolean(filterStatus || filterPriority || filterAssigneeId || searchQuery);
+  const hasActiveFilters = Boolean(filterStatus || filterPriority || filterAssigneeId || searchQuery || sortBy);
 
   const clearFilters = () => {
     setFilterStatus(null);
     setFilterPriority(null);
     setFilterAssigneeId(null);
     setSearchQuery('');
+    setSortBy(null);
   };
+
+  const standardColumns = [
+    { id: 'assignee', label: 'Responsável' },
+    { id: 'status', label: 'Status' },
+    { id: 'dueDate', label: 'Prazo' },
+    { id: 'priority', label: 'Prioridade' },
+    { id: 'timeline', label: 'Cronograma' },
+    { id: 'integrations', label: 'Integrações (Git/IA)' },
+  ];
 
   return (
     <div className="h-11 border-b border-[#212633] bg-[#141720] px-5 flex items-center justify-between text-xs select-none">
@@ -93,7 +113,7 @@ export const BoardToolbar: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setShowPersonDropdown(!showPersonDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
               filterAssigneeId ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
             }`}
           >
@@ -142,7 +162,7 @@ export const BoardToolbar: React.FC = () => {
         <div className="relative">
           <button
             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
               filterStatus || filterPriority ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
             }`}
           >
@@ -201,22 +221,154 @@ export const BoardToolbar: React.FC = () => {
         </div>
 
         {/* Ordenar */}
-        <button className="flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors">
-          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-          <span>Ordenar</span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowSortDropdown(!showSortDropdown)}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
+              sortBy ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
+            }`}
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+            <span>Ordenar</span>
+            {sortBy && <span className="font-mono text-[10px]">({sortBy.field})</span>}
+          </button>
 
-        {/* Ocultar */}
-        <button className="flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors">
-          <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-          <span>Ocultar</span>
-        </button>
+          {showSortDropdown && (
+            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+                Ordenar Demandas Por:
+              </span>
+              <button
+                onClick={() => {
+                  setSortBy({ field: 'dueDate', direction: sortBy?.direction === 'asc' ? 'desc' : 'asc' });
+                  setShowSortDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Prazo de Entrega</span>
+                {sortBy?.field === 'dueDate' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+              <button
+                onClick={() => {
+                  setSortBy({ field: 'priority', direction: 'desc' });
+                  setShowSortDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Prioridade (Mais crítica)</span>
+                {sortBy?.field === 'priority' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+              <button
+                onClick={() => {
+                  setSortBy({ field: 'title', direction: 'asc' });
+                  setShowSortDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Título (A - Z)</span>
+                {sortBy?.field === 'title' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
 
-        {/* Agrupar */}
-        <button className="flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors">
-          <Layers className="w-3.5 h-3.5 text-slate-400" />
-          <span>Agrupar</span>
-        </button>
+              {sortBy && (
+                <button
+                  onClick={() => {
+                    setSortBy(null);
+                    setShowSortDropdown(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded hover:bg-rose-950/30 text-rose-300 text-xs border-t border-[#262c3b] mt-1 cursor-pointer"
+                >
+                  Remover ordenação
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Ocultar Colunas */}
+        <div className="relative">
+          <button
+            onClick={() => setShowHideDropdown(!showHideDropdown)}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
+              hiddenColumns.length > 0 ? 'bg-amber-600/20 text-amber-400 border-amber-500/40' : 'border-transparent'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+            <span>Ocultar</span>
+            {hiddenColumns.length > 0 && <span className="font-mono text-[10px]">({hiddenColumns.length})</span>}
+          </button>
+
+          {showHideDropdown && (
+            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+                Exibir / Ocultar Colunas:
+              </span>
+              {standardColumns.map((col) => {
+                const isHidden = hiddenColumns.includes(col.id);
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => toggleColumnVisibility(col.id)}
+                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                  >
+                    <span className={isHidden ? 'text-slate-500 line-through' : 'text-slate-200'}>{col.label}</span>
+                    {!isHidden && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Agrupar por */}
+        <div className="relative">
+          <button
+            onClick={() => setShowGroupDropdown(!showGroupDropdown)}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
+              groupBy !== 'group' ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-slate-400" />
+            <span>Agrupar</span>
+          </button>
+
+          {showGroupDropdown && (
+            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+                Agrupar Demanda Por:
+              </span>
+              <button
+                onClick={() => {
+                  setGroupBy('group');
+                  setShowGroupDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Grupos de Trabalho (Padrão)</span>
+                {groupBy === 'group' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+              <button
+                onClick={() => {
+                  setGroupBy('status');
+                  setShowGroupDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Por Status</span>
+                {groupBy === 'status' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+              <button
+                onClick={() => {
+                  setGroupBy('assignee');
+                  setShowGroupDropdown(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+              >
+                <span>Por Responsável</span>
+                {groupBy === 'assignee' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+            </div>
+          )}
+        </div>
 
         {hasActiveFilters && (
           <button
