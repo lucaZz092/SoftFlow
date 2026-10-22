@@ -1,4 +1,4 @@
-export type TaskStatus = 'Pronto' | 'Em andamento' | 'Parado' | 'Em Revisão' | 'A Fazer' | 'Bloqueado';
+export type TaskStatus = 'Pronto' | 'Em andamento' | 'Trabalhando nisso' | 'Parado' | 'Em Revisão' | 'A Fazer' | 'Bloqueado';
 
 export type TaskPriority = 'Crítica' | 'Alta' | 'Média' | 'Baixa' | 'Nenhuma';
 
@@ -158,4 +158,4 @@ export interface AutomationRunLog {
   integrationType: 'Claude' | 'Codex' | 'GitHub' | 'Workflow';
 }
 
-export type ViewType = 'table' | 'kanban' | 'timeline' | 'automations' | 'metrics';
+export type ViewType = 'overview' | 'table' | 'kanban' | 'timeline' | 'automations' | 'metrics';

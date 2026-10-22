@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   X,
   Workflow,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { AutomationTriggerType, AutomationActionType, TaskStatus } from '../types';
+import { Button } from './ui/Button';
 
 export const NewAutomationModal: React.FC = () => {
   const { isNewAutomationOpen, setIsNewAutomationOpen, addAutomation, groups } = useProject();
@@ -17,6 +19,16 @@ export const NewAutomationModal: React.FC = () => {
   const [actionType, setActionType] = useState<AutomationActionType>('CODEX_GENERATE_TESTS');
   const [actionStatus, setActionStatus] = useState<TaskStatus>('Pronto');
   const [actionGroup, setActionGroup] = useState<string>(groups[0]?.id || 'group-marketing');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isNewAutomationOpen) {
+        setIsNewAutomationOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNewAutomationOpen, setIsNewAutomationOpen]);
 
   if (!isNewAutomationOpen) return null;
 
@@ -76,150 +88,159 @@ export const NewAutomationModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs select-none p-4">
-      <div className="w-full max-w-lg bg-[#161922] border border-[#242936] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsNewAutomationOpen(false)}
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+        className="relative w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden flex flex-col z-10"
+      >
         {/* Header */}
-        <div className="p-4 border-b border-[#212633] bg-[#141720] flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Workflow className="w-3.5 h-3.5" />
+        <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#0066ff]/10 border border-[#0066ff]/20 flex items-center justify-center text-[#0066ff] shrink-0">
+              <Workflow className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Criar Nova Automação</h2>
-              <p className="text-[11px] text-slate-400">Configure gatilhos e ações de fluxo contínuo</p>
+              <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                Criar Nova Automação
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">Configure gatilhos e ações de fluxo contínuo</p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => setIsNewAutomationOpen(false)}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#1e2330] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+            aria-label="Fechar"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
-          {/* Nome */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs overflow-y-auto">
           <div>
-            <label className="block text-slate-300 font-medium mb-1">Nome do Fluxo:</label>
+            <label className="block text-[var(--text-secondary)] font-medium mb-1.5">
+              Nome da Automação (Opcional):
+            </label>
             <input
               type="text"
-              required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="ex: Quando status for Em Revisão -> Codex Gera Testes"
-              className="w-full bg-[#1b1f2b] text-slate-200 px-3 py-1.5 rounded border border-[#272e3d] outline-none text-xs"
+              placeholder="ex: Quando PR for merged -> Mover para Pronto"
+              className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[#0066ff]"
             />
           </div>
 
-          {/* Builder Visual Block */}
-          <div className="p-3.5 rounded-lg bg-[#191d27] border border-[#252b39] space-y-3">
-            {/* QUANDO (Trigger) */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider block">
-                1. QUANDO [Gatilho de Disparo]:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Trigger Section */}
+          <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2.5">
+            <span className="text-[10px] font-bold text-[#0066ff] uppercase tracking-wider block">
+              1. Gatilho (QUANDO ISTO ACONTECER):
+            </span>
+            <select
+              value={triggerType}
+              onChange={(e) => setTriggerType(e.target.value as AutomationTriggerType)}
+              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+            >
+              <option value="STATUS_CHANGE">O status de uma demanda for alterado</option>
+              <option value="GITHUB_PR_MERGED">Um Pull Request for mesclado no GitHub</option>
+              <option value="GITHUB_PR_OPENED">Um novo Pull Request for aberto no GitHub</option>
+              <option value="TASK_CREATED">Uma nova demanda for criada no quadro</option>
+              <option value="PRIORITY_SET_CRITICAL">A prioridade for alterada para Crítica</option>
+            </select>
+
+            {triggerType === 'STATUS_CHANGE' && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[var(--text-muted)] text-[11px]">Para o status:</span>
                 <select
-                  value={triggerType}
-                  onChange={(e) => setTriggerType(e.target.value as AutomationTriggerType)}
-                  className="bg-[#1e2330] text-slate-200 px-2.5 py-1.5 rounded border border-[#293040] outline-none text-xs cursor-pointer"
+                  value={targetStatus}
+                  onChange={(e) => setTargetStatus(e.target.value as TaskStatus)}
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
                 >
-                  <option value="STATUS_CHANGE">Status da demanda mudar</option>
-                  <option value="GITHUB_PR_MERGED">PR do GitHub for mesclado (Merged)</option>
-                  <option value="GITHUB_PR_OPENED">Novo PR for aberto no GitHub</option>
-                  <option value="TASK_CREATED">Nova demanda for criada</option>
-                  <option value="PRIORITY_SET_CRITICAL">Prioridade for marcada como Crítica</option>
+                  {['A Fazer', 'Trabalhando nisso', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                 </select>
-
-                {triggerType === 'STATUS_CHANGE' && (
-                  <select
-                    value={targetStatus}
-                    onChange={(e) => setTargetStatus(e.target.value as TaskStatus)}
-                    className="bg-[#1e2330] text-slate-200 px-2.5 py-1.5 rounded border border-[#293040] outline-none text-xs font-semibold cursor-pointer"
-                  >
-                    <option value="Em Revisão">para "Em Revisão"</option>
-                    <option value="Em andamento">para "Em andamento"</option>
-                    <option value="Parado">para "Parado"</option>
-                    <option value="Pronto">para "Pronto"</option>
-                    <option value="A Fazer">para "A Fazer"</option>
-                  </select>
-                )}
               </div>
-            </div>
-
-            <div className="flex justify-center">
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 rotate-90" />
-            </div>
-
-            {/* ENTÃO (Action) */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block">
-                2. ENTÃO [Ação Automatizada]:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select
-                  value={actionType}
-                  onChange={(e) => setActionType(e.target.value as AutomationActionType)}
-                  className="bg-[#1e2330] text-slate-200 px-2.5 py-1.5 rounded border border-[#293040] outline-none text-xs cursor-pointer"
-                >
-                  <option value="CODEX_GENERATE_TESTS">⚡ Codex: Gerar testes unitários</option>
-                  <option value="CLAUDE_REFINE">🤖 Claude: Refinar critérios de aceite</option>
-                  <option value="GITHUB_CREATE_BRANCH">🐙 GitHub: Criar branch padronizada</option>
-                  <option value="SET_STATUS">Mudar status da demanda</option>
-                  <option value="MOVE_TO_GROUP">Mover para grupo</option>
-                  <option value="NOTIFY_TEAM">Notificar responsáveis e equipe</option>
-                </select>
-
-                {actionType === 'SET_STATUS' && (
-                  <select
-                    value={actionStatus}
-                    onChange={(e) => setActionStatus(e.target.value as TaskStatus)}
-                    className="bg-[#1e2330] text-slate-200 px-2.5 py-1.5 rounded border border-[#293040] outline-none text-xs cursor-pointer"
-                  >
-                    <option value="Pronto">definir como Pronto</option>
-                    <option value="Em andamento">definir como Em andamento</option>
-                    <option value="Em Revisão">definir como Em Revisão</option>
-                    <option value="Parado">definir como Parado</option>
-                  </select>
-                )}
-
-                {actionType === 'MOVE_TO_GROUP' && (
-                  <select
-                    value={actionGroup}
-                    onChange={(e) => setActionGroup(e.target.value)}
-                    className="bg-[#1e2330] text-slate-200 px-2.5 py-1.5 rounded border border-[#293040] outline-none text-xs cursor-pointer"
-                  >
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.title}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Submit */}
-          <div className="pt-1 flex items-center justify-end space-x-2">
-            <button
-              type="button"
-              onClick={() => setIsNewAutomationOpen(false)}
-              className="px-3 py-1.5 rounded text-slate-400 hover:text-white cursor-pointer"
+          {/* Action Section */}
+          <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2.5">
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block">
+              2. Ação (ENTÃO FAZER ISTO):
+            </span>
+            <select
+              value={actionType}
+              onChange={(e) => setActionType(e.target.value as AutomationActionType)}
+              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
             >
+              <option value="CODEX_GENERATE_TESTS">Acionar Codex para gerar testes unitários (Vitest)</option>
+              <option value="CLAUDE_REFINE">Acionar Claude para refinar histórias e critérios</option>
+              <option value="GITHUB_CREATE_BRANCH">Criar branch padronizada feature/ no GitHub</option>
+              <option value="SET_STATUS">Alterar status da demanda</option>
+              <option value="MOVE_TO_GROUP">Mover demanda para outro grupo</option>
+              <option value="NOTIFY_TEAM">Notificar a equipe de engenharia</option>
+            </select>
+
+            {actionType === 'SET_STATUS' && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[var(--text-muted)] text-[11px]">Definir para:</span>
+                <select
+                  value={actionStatus}
+                  onChange={(e) => setActionStatus(e.target.value as TaskStatus)}
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
+                >
+                  {['A Fazer', 'Trabalhando nisso', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {actionType === 'MOVE_TO_GROUP' && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[var(--text-muted)] text-[11px]">Mover para:</span>
+                <select
+                  value={actionGroup}
+                  onChange={(e) => setActionGroup(e.target.value)}
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2.5 pt-4">
+            <Button variant="ghost" size="sm" onClick={() => setIsNewAutomationOpen(false)}>
               Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-1.5 rounded bg-[#0073ea] hover:bg-[#0062c7] text-white font-semibold cursor-pointer shadow-xs"
-            >
-              Ativar Automação
-            </button>
+            </Button>
+            <Button variant="primary" size="sm" type="submit">
+              Criar Automação
+            </Button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

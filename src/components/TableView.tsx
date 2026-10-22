@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronDown,
   ChevronRight,
@@ -14,10 +15,15 @@ import {
   CheckCircle2,
   ExternalLink,
   Layers,
+  Check,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { TaskStatus, TaskPriority, CustomColumn, Task, Group } from '../types';
-import { STATUS_CONFIG, PRIORITY_CONFIG, TEAM_MEMBERS } from '../data/mockData';
+import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
+import { TEAM_MEMBERS } from '../data/mockData';
+import { Button } from './ui/Button';
+import { ConfirmDialog } from './ui/ConfirmDialog';
+import { EmptyState } from './ui/EmptyState';
 
 export const TableView: React.FC = () => {
   const {
@@ -58,14 +64,33 @@ export const TableView: React.FC = () => {
   const [activePriorityPopover, setActivePriorityPopover] = useState<string | null>(null);
   const [activeAssigneePopover, setActiveAssigneePopover] = useState<string | null>(null);
   const [activeDatePickerTaskId, setActiveDatePickerTaskId] = useState<string | null>(null);
-  
+
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [newGroupTitle, setNewGroupTitle] = useState('');
-  
+
+  // Task to delete modal
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
   // Custom Column modal
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
   const [newColTitle, setNewColTitle] = useState('');
   const [newColType, setNewColType] = useState<CustomColumn['type']>('text');
+
+  // Close popovers on click outside
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.popover-container')) {
+        setActiveStatusPopover(null);
+        setActivePriorityPopover(null);
+        setActiveAssigneePopover(null);
+        setActiveDatePickerTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, []);
 
   // Filter tasks
   let filteredTasks = tasks.filter((task) => {
@@ -88,7 +113,7 @@ export const TableView: React.FC = () => {
       let valA: any = a[sortBy.field];
       let valB: any = b[sortBy.field];
       if (sortBy.field === 'priority') {
-        const order: Record<string, number> = { 'Crítica': 4, 'Alta': 3, 'Média': 2, 'Baixa': 1, 'Nenhuma': 0 };
+        const order: Record<string, number> = { Crítica: 4, Alta: 3, Média: 2, Baixa: 1, Nenhuma: 0 };
         valA = order[a.priority] || 0;
         valB = order[b.priority] || 0;
       }
@@ -102,11 +127,11 @@ export const TableView: React.FC = () => {
   let displayGroups: { id: string; title: string; color: string; collapsed: boolean; tasks: Task[] }[] = [];
 
   if (groupBy === 'status') {
-    const statuses: TaskStatus[] = ['A Fazer', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'];
+    const statuses: TaskStatus[] = ['A Fazer', 'Trabalhando nisso', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'];
     displayGroups = statuses.map((st) => ({
       id: `group-status-${st}`,
       title: st,
-      color: STATUS_CONFIG[st]?.bg || '#579bfc',
+      color: STATUS_STYLES[st]?.dot ? '#0066ff' : '#64748b',
       collapsed: false,
       tasks: filteredTasks.filter((t) => t.status === st),
     }));
@@ -120,97 +145,112 @@ export const TableView: React.FC = () => {
         tasks: filteredTasks.filter((t) => t.assignee?.id === m.id),
       })),
       {
-        id: 'group-unassigned',
-        title: 'Sem Responsável',
+        id: 'group-user-unassigned',
+        title: 'Não atribuído',
         color: '#64748b',
         collapsed: false,
         tasks: filteredTasks.filter((t) => !t.assignee),
       },
     ];
   } else {
-    // Default by business group
+    // Default group by Group
     displayGroups = groups.map((g) => ({
-      ...g,
+      id: g.id,
+      title: g.title,
+      color: g.color,
+      collapsed: g.collapsed,
       tasks: filteredTasks.filter((t) => t.groupId === g.id),
     }));
   }
 
   const handleInlineAddTask = (groupId: string) => {
     const title = newTaskTitles[groupId]?.trim();
-    const targetGroupId = groups.some((g) => g.id === groupId) ? groupId : groups[0]?.id || 'group-marketing';
-    if (title) {
-      addTask(targetGroupId, title);
-      setNewTaskTitles((prev) => ({ ...prev, [groupId]: '' }));
-    } else {
-      addTask(targetGroupId, 'Nova Demanda');
-    }
+    if (!title) return;
+    addTask(groupId, title);
+    setNewTaskTitles((prev) => ({ ...prev, [groupId]: '' }));
   };
 
   const handleCreateGroup = () => {
-    if (newGroupTitle.trim()) {
-      addGroup(newGroupTitle.trim());
-      setNewGroupTitle('');
-      setIsAddingGroup(false);
-    }
+    if (!newGroupTitle.trim()) return;
+    addGroup(newGroupTitle.trim(), '#0066ff');
+    setNewGroupTitle('');
+    setIsAddingGroup(false);
   };
 
   const handleCreateColumn = () => {
-    if (newColTitle.trim()) {
-      addCustomColumn(newColTitle.trim(), newColType);
-      setNewColTitle('');
-      setIsAddColumnOpen(false);
-    }
+    if (!newColTitle.trim()) return;
+    addCustomColumn(newColTitle.trim(), newColType);
+    setNewColTitle('');
+    setIsAddColumnOpen(false);
   };
 
-  const handleSetDate = (taskId: string, dateStr: string) => {
+  const handleSetDate = (taskId: string, newDate: string) => {
+    if (!newDate) return;
     updateTask(taskId, {
-      dueDate: dateStr,
+      dueDate: newDate,
       timeline: {
-        start: new Date().toISOString().split('T')[0],
-        end: dateStr,
+        start: newDate,
+        end: newDate,
       },
     });
     setActiveDatePickerTaskId(null);
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 select-none bg-[#12141a]">
-      {/* Floating Bulk Action Bar when items are selected */}
-      {selectedTaskIds.length > 0 && (
-        <div className="sticky top-0 z-40 p-2.5 rounded-lg bg-[#191d27] border border-[#2b3345] shadow-xl flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1">
-          <div className="flex items-center space-x-3">
-            <span className="font-semibold text-white px-2 py-0.5 rounded bg-[#0073ea]">
-              {selectedTaskIds.length} {selectedTaskIds.length === 1 ? 'selecionada' : 'selecionadas'}
-            </span>
-            <span className="text-slate-400">Ações em lote:</span>
-            <button
-              onClick={() => bulkSetStatus('Pronto')}
-              className="px-2.5 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 font-medium transition-colors cursor-pointer"
-            >
-              Marcar como Pronto
-            </button>
-            <button
-              onClick={() => bulkSetStatus('Em andamento')}
-              className="px-2.5 py-1 rounded bg-amber-600/30 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 font-medium transition-colors cursor-pointer"
-            >
-              Marcar Em andamento
-            </button>
-            <button
-              onClick={bulkDeleteTasks}
-              className="px-2.5 py-1 rounded bg-rose-600/30 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 font-medium transition-colors cursor-pointer"
-            >
-              Excluir selecionadas
-            </button>
-          </div>
-
-          <button
-            onClick={clearTaskSelection}
-            className="text-slate-400 hover:text-white px-2 py-1 rounded cursor-pointer"
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-28 select-none transition-colors">
+      {/* Floating Bulk Selection Action Bar */}
+      <AnimatePresence>
+        {selectedTaskIds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-strong)] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-3.5 backdrop-blur-md"
           >
-            Limpar seleção
-          </button>
-        </div>
-      )}
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-md bg-[#0066ff] text-white text-[11px] font-bold flex items-center justify-center font-mono">
+                {selectedTaskIds.length}
+              </span>
+              <span className="text-xs font-semibold">Demandas selecionadas</span>
+            </div>
+
+            <div className="h-4 w-px bg-[var(--border-subtle)]" />
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => bulkSetStatus('Pronto')}
+                className="text-emerald-500 hover:text-emerald-600"
+              >
+                Marcar Pronto
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => bulkSetStatus('Em andamento')}
+              >
+                Em Andamento
+              </Button>
+              <Button
+                variant="danger"
+                size="xs"
+                onClick={() => setIsBulkDeleteOpen(true)}
+              >
+                Excluir
+              </Button>
+            </div>
+
+            <button
+              type="button"
+              onClick={clearTaskSelection}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] px-1.5 py-0.5 rounded cursor-pointer ml-1"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {displayGroups.map((group) => {
         const groupTasks = group.tasks;
@@ -224,13 +264,18 @@ export const TableView: React.FC = () => {
         });
 
         return (
-          <div key={group.id} className="rounded-lg border border-[#212633] bg-[#161922] shadow-xs overflow-hidden">
+          <div
+            key={group.id}
+            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-xs overflow-hidden transition-all"
+          >
             {/* Group Header */}
-            <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#171b25] border-b border-[#212633]">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2.5">
                 <button
+                  type="button"
                   onClick={() => toggleGroupCollapse(group.id)}
-                  className="p-1 rounded hover:bg-[#202533] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="p-1 rounded-md hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                  aria-label="Alternar expansão do grupo"
                 >
                   {group.collapsed ? (
                     <ChevronRight className="w-4 h-4" style={{ color: group.color }} />
@@ -239,72 +284,75 @@ export const TableView: React.FC = () => {
                   )}
                 </button>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <span className="font-bold text-sm tracking-tight" style={{ color: group.color }}>
                     {group.title}
                   </span>
-                  <span className="text-[11px] text-slate-400 font-mono tabular-nums">
-                    ({totalCount} {totalCount === 1 ? 'tarefa' : 'tarefas'})
+                  <span className="text-[11px] text-[var(--text-muted)] font-mono tabular-nums px-1.5 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+                    {totalCount}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="xs"
                   onClick={() => handleInlineAddTask(group.id)}
-                  className="flex items-center space-x-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-[#202533] transition-colors cursor-pointer"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Nova tarefa</span>
-                </button>
+                  Nova demanda
+                </Button>
               </div>
             </div>
 
             {/* Group Table */}
             {!group.collapsed && (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
+                <table className="w-full text-left border-collapse min-w-[980px]">
                   <thead>
-                    <tr className="border-b border-[#212633] text-[11px] font-semibold text-slate-400 bg-[#151821]">
-                      <th className="w-9 px-3 py-2 text-center">
+                    <tr className="border-b border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-canvas)]">
+                      <th className="w-10 px-3 py-2.5 text-center">
                         <input
                           type="checkbox"
                           checked={allGroupSelected}
                           onChange={() => selectAllTasksInGroup(group.id)}
-                          className="rounded bg-[#1e222e] border-[#2d3443] text-blue-500 cursor-pointer"
+                          className="rounded border-[var(--border-subtle)] text-[#0066ff] cursor-pointer focus:ring-1 focus:ring-[#0066ff]"
+                          aria-label="Selecionar todas as tarefas deste grupo"
                         />
                       </th>
-                      <th className="px-3 py-2 min-w-[280px]">Demanda / Tarefa</th>
-                      <th className="w-10 px-2 py-2 text-center"></th>
+                      <th className="px-3 py-2.5 min-w-[280px]">Demanda / Tarefa</th>
+                      <th className="w-10 px-2 py-2.5 text-center" aria-label="Comentários"></th>
 
                       {/* Configurable standard columns */}
                       {!hiddenColumns.includes('assignee') && (
-                        <th className="w-28 px-3 py-2 text-center">Responsável</th>
+                        <th className="w-28 px-3 py-2.5 text-center">Responsável</th>
                       )}
                       {!hiddenColumns.includes('status') && (
-                        <th className="w-36 px-3 py-2 text-center">Status</th>
+                        <th className="w-36 px-3 py-2.5 text-center">Status</th>
                       )}
                       {!hiddenColumns.includes('dueDate') && (
-                        <th className="w-28 px-3 py-2 text-center">Prazo</th>
+                        <th className="w-28 px-3 py-2.5 text-center">Prazo</th>
                       )}
                       {!hiddenColumns.includes('priority') && (
-                        <th className="w-28 px-3 py-2 text-center">Prioridade</th>
+                        <th className="w-28 px-3 py-2.5 text-center">Prioridade</th>
                       )}
                       {!hiddenColumns.includes('timeline') && (
-                        <th className="w-36 px-3 py-2 text-center">Cronograma</th>
+                        <th className="w-36 px-3 py-2.5 text-center">Cronograma</th>
                       )}
                       {!hiddenColumns.includes('integrations') && (
-                        <th className="w-36 px-3 py-2 text-center">Integrações (Git / IA)</th>
+                        <th className="w-36 px-3 py-2.5 text-center">Integrações (Git / IA)</th>
                       )}
 
                       {/* Dynamic Custom Columns */}
                       {customColumns.map((col) => (
-                        <th key={col.id} className="w-32 px-3 py-2 text-center relative group/col">
-                          <div className="flex items-center justify-center space-x-1">
+                        <th key={col.id} className="w-32 px-3 py-2.5 text-center relative group/col">
+                          <div className="flex items-center justify-center gap-1">
                             <span className="truncate">{col.title}</span>
                             <button
+                              type="button"
                               onClick={() => removeCustomColumn(col.id)}
-                              className="text-slate-500 hover:text-rose-400 opacity-0 group-hover/col:opacity-100 transition-opacity ml-1"
+                              className="text-[var(--text-muted)] hover:text-rose-500 opacity-0 group-hover/col:opacity-100 transition-opacity ml-1"
                               title="Remover coluna"
                             >
                               <X className="w-3 h-3" />
@@ -314,21 +362,23 @@ export const TableView: React.FC = () => {
                       ))}
 
                       {/* Add Column button */}
-                      <th className="w-10 px-2 py-2 text-center relative">
+                      <th className="w-10 px-2 py-2.5 text-center relative">
                         <button
+                          type="button"
                           onClick={() => setIsAddColumnOpen(true)}
-                          className="text-slate-400 hover:text-white p-1 rounded hover:bg-[#202533] cursor-pointer"
+                          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors"
                           title="Criar nova coluna personalizada"
+                          aria-label="Adicionar coluna"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#202532] text-xs">
+                  <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
                     {groupTasks.map((task) => {
-                      const statusInfo = STATUS_CONFIG[task.status] || STATUS_CONFIG['A Fazer'];
-                      const priorityInfo = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG['Média'];
+                      const statusStyle = STATUS_STYLES[task.status] || STATUS_STYLES['Novo'];
+                      const priorityStyle = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['Média'];
                       const hasSubtasks = task.subtasks && task.subtasks.length > 0;
                       const completedSubtasks = task.subtasks?.filter((s) => s.completed).length || 0;
                       const isSelected = selectedTaskIds.includes(task.id);
@@ -336,23 +386,24 @@ export const TableView: React.FC = () => {
                       return (
                         <tr
                           key={task.id}
-                          className={`hover:bg-[#1a1e28] transition-colors group relative ${
-                            isSelected ? 'bg-[#0073ea]/10' : ''
+                          className={`hover:bg-[var(--bg-surface-hover)] transition-colors group relative ${
+                            isSelected ? 'bg-blue-500/10' : ''
                           }`}
                         >
                           {/* Checkbox */}
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-3 py-2.5 text-center">
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleTaskSelection(task.id)}
-                              className="rounded bg-[#1e222e] border-[#2d3443] text-blue-500 cursor-pointer"
+                              className="rounded border-[var(--border-subtle)] text-[#0066ff] cursor-pointer"
+                              aria-label={`Selecionar ${task.title}`}
                             />
                           </td>
 
                           {/* Task title */}
-                          <td className="px-3 py-2">
-                            <div className="flex items-center space-x-2">
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
                               {editingTaskId === task.id ? (
                                 <input
                                   type="text"
@@ -364,16 +415,18 @@ export const TableView: React.FC = () => {
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
-                                      updateTask(task.id, { title: (e.target as HTMLInputElement).value.trim() || task.title });
+                                      updateTask(task.id, {
+                                        title: (e.target as HTMLInputElement).value.trim() || task.title,
+                                      });
                                       setEditingTaskId(null);
                                     }
                                   }}
-                                  className="w-full bg-[#1e222e] text-white px-2 py-1 rounded border border-[#0073ea] outline-none text-xs"
+                                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-2 py-1 rounded-md border border-[#0066ff] outline-none text-xs"
                                 />
                               ) : (
                                 <span
                                   onClick={() => setEditingTaskId(task.id)}
-                                  className="font-medium text-slate-200 hover:text-white cursor-pointer truncate max-w-[340px]"
+                                  className="font-medium text-[var(--text-primary)] hover:text-[#0066ff] cursor-pointer truncate max-w-[340px] transition-colors"
                                   title="Clique para editar o título"
                                 >
                                   {task.title}
@@ -382,8 +435,9 @@ export const TableView: React.FC = () => {
 
                               {hasSubtasks && (
                                 <button
+                                  type="button"
                                   onClick={() => setSelectedTaskId(task.id)}
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums text-slate-300 bg-[#1e2330] hover:bg-[#252c3c] border border-[#293040] cursor-pointer"
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums text-[var(--text-secondary)] bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] cursor-pointer"
                                   title="Sub-tarefas concluídas"
                                 >
                                   {completedSubtasks}/{task.subtasks.length}
@@ -393,15 +447,17 @@ export const TableView: React.FC = () => {
                           </td>
 
                           {/* Chat / Updates Icon */}
-                          <td className="px-2 py-2 text-center">
+                          <td className="px-2 py-2.5 text-center">
                             <button
+                              type="button"
                               onClick={() => setSelectedTaskId(task.id)}
-                              className="p-1.5 rounded hover:bg-[#202533] text-slate-400 hover:text-blue-400 transition-colors relative cursor-pointer"
+                              className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#0066ff] transition-colors relative cursor-pointer"
                               title="Ver atualizações, logs de IA e comentários"
+                              aria-label="Abrir detalhes da tarefa"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               {task.comments.length > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#0073ea] text-white text-[8px] font-bold rounded-full flex items-center justify-center font-mono">
+                                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-[#0066ff] text-white text-[8px] font-bold rounded-full flex items-center justify-center font-mono">
                                   {task.comments.length}
                                 </span>
                               )}
@@ -410,7 +466,7 @@ export const TableView: React.FC = () => {
 
                           {/* Responsável / Assignee */}
                           {!hiddenColumns.includes('assignee') && (
-                            <td className="px-3 py-2 text-center relative">
+                            <td className="px-3 py-2.5 text-center relative popover-container">
                               <div
                                 onClick={() =>
                                   setActiveAssigneePopover(activeAssigneePopover === task.id ? null : task.id)
@@ -426,25 +482,26 @@ export const TableView: React.FC = () => {
                                     {task.assignee.initials}
                                   </div>
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full border border-dashed border-slate-500 text-slate-400 text-xs flex items-center justify-center hover:border-slate-300">
+                                  <div className="w-6 h-6 rounded-full border border-dashed border-[var(--border-strong)] text-[var(--text-muted)] text-xs flex items-center justify-center hover:border-[#0066ff] transition-colors">
                                     +
                                   </div>
                                 )}
                               </div>
 
                               {activeAssigneePopover === task.id && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-48 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1 z-30">
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-52 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-40 space-y-0.5">
                                   {TEAM_MEMBERS.map((m) => (
                                     <button
+                                      type="button"
                                       key={m.id}
                                       onClick={() => {
                                         updateTask(task.id, { assignee: m });
                                         setActiveAssigneePopover(null);
                                       }}
-                                      className="w-full px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-300 cursor-pointer flex items-center space-x-2 text-xs text-left"
+                                      className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center gap-2 text-xs text-left transition-colors"
                                     >
                                       <span
-                                        className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0"
+                                        className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0 shadow-xs"
                                         style={{ backgroundColor: m.color }}
                                       >
                                         {m.initials}
@@ -459,33 +516,48 @@ export const TableView: React.FC = () => {
 
                           {/* Status Cell */}
                           {!hiddenColumns.includes('status') && (
-                            <td className="px-3 py-2 text-center relative">
+                            <td className="px-3 py-2.5 text-center relative popover-container">
                               <button
+                                type="button"
                                 onClick={() =>
                                   setActiveStatusPopover(activeStatusPopover === task.id ? null : task.id)
                                 }
-                                style={{ backgroundColor: statusInfo.bg, color: statusInfo.text }}
-                                className="w-28 py-1 px-2 rounded-[4px] font-medium text-xs shadow-xs flex items-center justify-center space-x-1 transition-opacity hover:opacity-90 mx-auto cursor-pointer"
+                                className={`w-32 py-1 px-2.5 rounded-md font-medium text-xs border shadow-xs flex items-center justify-center gap-1.5 transition-all hover:opacity-90 mx-auto cursor-pointer ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
                               >
-                                {task.status === 'Parado' && <AlertCircle className="w-3 h-3 shrink-0" />}
-                                <span className="truncate">{statusInfo.label}</span>
+                                {statusStyle.dot && (
+                                  <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                                )}
+                                <span className="truncate">{statusStyle.label}</span>
                               </button>
 
                               {activeStatusPopover === task.id && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-36 bg-[#171a23] border border-[#2b3243] rounded-md shadow-2xl p-1 z-40 space-y-1">
-                                  {Object.keys(STATUS_CONFIG).map((s) => (
-                                    <button
-                                      key={s}
-                                      onClick={() => {
-                                        changeTaskStatus(task.id, s as TaskStatus);
-                                        setActiveStatusPopover(null);
-                                      }}
-                                      style={{ backgroundColor: STATUS_CONFIG[s].bg }}
-                                      className="w-full text-white py-1 px-2 rounded-[3px] text-xs font-semibold hover:brightness-110 transition-all flex items-center justify-center cursor-pointer shadow-xs"
-                                    >
-                                      {s}
-                                    </button>
-                                  ))}
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-40 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-1.5 z-40 space-y-1">
+                                  {(
+                                    [
+                                      'A Fazer',
+                                      'Trabalhando nisso',
+                                      'Em andamento',
+                                      'Em Revisão',
+                                      'Parado',
+                                      'Pronto',
+                                    ] as TaskStatus[]
+                                  ).map((s) => {
+                                    const st = STATUS_STYLES[s] || STATUS_STYLES['Novo'];
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={s}
+                                        onClick={() => {
+                                          changeTaskStatus(task.id, s);
+                                          setActiveStatusPopover(null);
+                                        }}
+                                        className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold hover:brightness-105 transition-all flex items-center gap-2 cursor-pointer border ${st.bg} ${st.text} ${st.border}`}
+                                      >
+                                        {st.dot && <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />}
+                                        <span className="truncate">{s}</span>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </td>
@@ -493,42 +565,45 @@ export const TableView: React.FC = () => {
 
                           {/* Prazo with interactive popover calendar */}
                           {!hiddenColumns.includes('dueDate') && (
-                            <td className="px-3 py-2 text-center relative">
+                            <td className="px-3 py-2.5 text-center relative popover-container">
                               <button
+                                type="button"
                                 onClick={() =>
                                   setActiveDatePickerTaskId(activeDatePickerTaskId === task.id ? null : task.id)
                                 }
-                                className="text-slate-300 font-mono tabular-nums text-[11px] px-2 py-0.5 rounded bg-[#1b1f2b] hover:bg-[#222838] border border-[#262c3b] cursor-pointer transition-colors"
+                                className="text-[var(--text-primary)] font-mono tabular-nums text-xs px-2.5 py-1 rounded-md bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] cursor-pointer transition-colors"
                               >
                                 {task.dueDate ? task.dueDate.slice(5) : '-'}
                               </button>
 
                               {activeDatePickerTaskId === task.id && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-48 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-2xl p-2 z-40 space-y-2">
-                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-52 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-3 z-40 space-y-2.5">
+                                  <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                                     Definir Prazo
                                   </div>
                                   <input
                                     type="date"
                                     defaultValue={task.dueDate}
                                     onChange={(e) => handleSetDate(task.id, e.target.value)}
-                                    className="w-full bg-[#202533] text-white p-1 rounded border border-[#2d3443] text-xs outline-none"
+                                    className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] p-1.5 rounded-lg border border-[var(--border-subtle)] text-xs outline-none"
                                   />
-                                  <div className="grid grid-cols-2 gap-1 pt-1 border-t border-[#262c3b]">
+                                  <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-[var(--border-subtle)]">
                                     <button
+                                      type="button"
                                       onClick={() => handleSetDate(task.id, new Date().toISOString().split('T')[0])}
-                                      className="px-2 py-1 bg-[#202533] hover:bg-[#282f40] rounded text-[10px] text-slate-300 cursor-pointer"
+                                      className="px-2 py-1 bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] rounded-md text-[11px] text-[var(--text-primary)] cursor-pointer transition-colors"
                                     >
                                       Hoje
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         handleSetDate(
                                           task.id,
                                           new Date(Date.now() + 86400000).toISOString().split('T')[0]
                                         )
                                       }
-                                      className="px-2 py-1 bg-[#202533] hover:bg-[#282f40] rounded text-[10px] text-slate-300 cursor-pointer"
+                                      className="px-2 py-1 bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] rounded-md text-[11px] text-[var(--text-primary)] cursor-pointer transition-colors"
                                     >
                                       Amanhã
                                     </button>
@@ -540,32 +615,39 @@ export const TableView: React.FC = () => {
 
                           {/* Prioridade Cell */}
                           {!hiddenColumns.includes('priority') && (
-                            <td className="px-3 py-2 text-center relative">
+                            <td className="px-3 py-2.5 text-center relative popover-container">
                               <button
+                                type="button"
                                 onClick={() =>
                                   setActivePriorityPopover(activePriorityPopover === task.id ? null : task.id)
                                 }
-                                style={{ backgroundColor: priorityInfo.bg, color: priorityInfo.text }}
-                                className="w-24 py-1 px-2 rounded-[4px] font-medium text-xs shadow-xs flex items-center justify-center transition-opacity hover:opacity-90 mx-auto cursor-pointer"
+                                className={`w-28 py-1 px-2 rounded-md font-medium text-xs border shadow-xs flex items-center justify-center gap-1.5 transition-all hover:opacity-90 mx-auto cursor-pointer ${priorityStyle.bg} ${priorityStyle.text} ${priorityStyle.border}`}
                               >
-                                <span className="truncate">{priorityInfo.label}</span>
+                                {priorityStyle.dot && (
+                                  <span className={`w-1.5 h-1.5 rounded-full ${priorityStyle.dot}`} />
+                                )}
+                                <span className="truncate">{priorityStyle.label}</span>
                               </button>
 
                               {activePriorityPopover === task.id && (
-                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-32 bg-[#171a23] border border-[#2b3243] rounded-md shadow-2xl p-1 z-40 space-y-1">
-                                  {['Crítica', 'Alta', 'Média', 'Baixa'].map((p) => (
-                                    <button
-                                      key={p}
-                                      onClick={() => {
-                                        changeTaskPriority(task.id, p as TaskPriority);
-                                        setActivePriorityPopover(null);
-                                      }}
-                                      style={{ backgroundColor: PRIORITY_CONFIG[p].bg, color: PRIORITY_CONFIG[p].text }}
-                                      className="w-full py-1 px-2 rounded-[3px] text-xs font-semibold hover:brightness-110 transition-all flex items-center justify-center cursor-pointer shadow-xs"
-                                    >
-                                      {p}
-                                    </button>
-                                  ))}
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-36 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-1.5 z-40 space-y-1">
+                                  {(['Crítica', 'Alta', 'Média', 'Baixa'] as TaskPriority[]).map((p) => {
+                                    const pr = PRIORITY_STYLES[p] || PRIORITY_STYLES['Média'];
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={p}
+                                        onClick={() => {
+                                          changeTaskPriority(task.id, p);
+                                          setActivePriorityPopover(null);
+                                        }}
+                                        className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-semibold hover:brightness-105 transition-all flex items-center gap-2 cursor-pointer border ${pr.bg} ${pr.text} ${pr.border}`}
+                                      >
+                                        {pr.dot && <span className={`w-1.5 h-1.5 rounded-full ${pr.dot}`} />}
+                                        <span className="truncate">{p}</span>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </td>
@@ -573,13 +655,13 @@ export const TableView: React.FC = () => {
 
                           {/* Cronograma pill */}
                           {!hiddenColumns.includes('timeline') && (
-                            <td className="px-3 py-2 text-center">
-                              <div className="w-28 mx-auto h-5 bg-[#1b1f2b] rounded-full overflow-hidden flex items-center justify-center text-[10px] text-white font-medium relative border border-[#262c3b]">
+                            <td className="px-3 py-2.5 text-center">
+                              <div className="w-28 mx-auto h-5 bg-[var(--bg-canvas)] rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium relative border border-[var(--border-subtle)]">
                                 <div
-                                  className="absolute left-0 top-0 bottom-0 bg-[#0073ea] opacity-70"
+                                  className="absolute left-0 top-0 bottom-0 bg-[#0066ff] opacity-40"
                                   style={{ width: task.status === 'Pronto' ? '100%' : '60%' }}
                                 />
-                                <span className="relative z-10 font-mono tabular-nums tracking-tight text-[9px] px-1 truncate">
+                                <span className="relative z-10 font-mono tabular-nums tracking-tight text-[10px] px-1 truncate text-[var(--text-primary)]">
                                   {task.timeline.start.slice(5)} - {task.timeline.end.slice(5)}
                                 </span>
                               </div>
@@ -588,15 +670,16 @@ export const TableView: React.FC = () => {
 
                           {/* Integrações */}
                           {!hiddenColumns.includes('integrations') && (
-                            <td className="px-3 py-2 text-center">
-                              <div className="flex items-center justify-center space-x-1.5">
+                            <td className="px-3 py-2.5 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
                                 {task.integrations.github ? (
                                   <button
+                                    type="button"
                                     onClick={() => setSelectedTaskId(task.id)}
-                                    className={`px-1.5 py-0.5 rounded text-[10px] flex items-center space-x-1 cursor-pointer font-mono tabular-nums ${
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] flex items-center gap-1 cursor-pointer font-mono tabular-nums ${
                                       task.integrations.github.prStatus === 'merged'
-                                        ? 'bg-purple-900/30 text-purple-300 border border-purple-500/30'
-                                        : 'bg-emerald-900/30 text-emerald-300 border border-emerald-500/30'
+                                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                     }`}
                                     title={`PR #${task.integrations.github.prNumber || ''} (${task.integrations.github.prStatus || 'linked'})`}
                                   >
@@ -607,18 +690,20 @@ export const TableView: React.FC = () => {
 
                                 {task.integrations.claude ? (
                                   <button
+                                    type="button"
                                     onClick={() => setSelectedTaskId(task.id)}
-                                    className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 flex items-center space-x-1 cursor-pointer"
-                                    title="Critérios de aceite refinados pelo Claude"
+                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-[#0066ff] border border-blue-500/20 flex items-center gap-1 cursor-pointer font-medium"
+                                    title="Critérios de aceite gerados pelo Claude"
                                   >
-                                    <Bot className="w-3 h-3 text-indigo-400" />
+                                    <Bot className="w-3 h-3" />
                                     <span>Stories</span>
                                   </button>
                                 ) : (
                                   <button
+                                    type="button"
                                     onClick={() => simulateClaudeRefine(task.id)}
-                                    className="text-[10px] text-slate-500 hover:text-indigo-400 transition-colors p-1 cursor-pointer"
-                                    title="Refinar com Claude"
+                                    className="text-[var(--text-muted)] hover:text-[#0066ff] transition-colors p-1 cursor-pointer"
+                                    title="Refinar histórias com Claude"
                                   >
                                     <Bot className="w-3.5 h-3.5" />
                                   </button>
@@ -626,17 +711,19 @@ export const TableView: React.FC = () => {
 
                                 {task.integrations.codex ? (
                                   <button
+                                    type="button"
                                     onClick={() => setSelectedTaskId(task.id)}
-                                    className="px-1.5 py-0.5 rounded text-[10px] bg-amber-900/30 text-amber-300 border border-amber-500/30 flex items-center space-x-1 cursor-pointer"
+                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1 cursor-pointer font-medium"
                                     title="Testes unitários gerados pelo Codex"
                                   >
-                                    <Zap className="w-3 h-3 text-amber-400" />
+                                    <Zap className="w-3 h-3" />
                                     <span>Testes</span>
                                   </button>
                                 ) : (
                                   <button
+                                    type="button"
                                     onClick={() => simulateCodexTestGeneration(task.id)}
-                                    className="text-[10px] text-slate-500 hover:text-amber-400 transition-colors p-1 cursor-pointer"
+                                    className="text-[var(--text-muted)] hover:text-amber-500 transition-colors p-1 cursor-pointer"
                                     title="Gerar testes com Codex"
                                   >
                                     <Zap className="w-3.5 h-3.5" />
@@ -650,24 +737,25 @@ export const TableView: React.FC = () => {
                           {customColumns.map((col) => {
                             const val = task.customFields?.[col.id] ?? '';
                             return (
-                              <td key={col.id} className="px-3 py-2 text-center">
+                              <td key={col.id} className="px-3 py-2.5 text-center">
                                 <input
                                   type={col.type === 'number' ? 'number' : 'text'}
                                   defaultValue={val}
                                   placeholder="-"
                                   onBlur={(e) => updateCustomFieldValue(task.id, col.id, e.target.value)}
-                                  className="w-full bg-transparent hover:bg-[#202533] focus:bg-[#202533] text-center text-slate-200 outline-none text-xs rounded px-1 py-0.5 border border-transparent focus:border-[#0073ea] font-mono tabular-nums transition-colors"
+                                  className="w-full bg-transparent hover:bg-[var(--bg-canvas)] focus:bg-[var(--bg-canvas)] text-center text-[var(--text-primary)] outline-none text-xs rounded-md px-1.5 py-0.5 border border-transparent focus:border-[#0066ff] font-mono tabular-nums transition-colors"
                                 />
                               </td>
                             );
                           })}
 
                           {/* Row Actions */}
-                          <td className="px-2 py-2 text-center">
+                          <td className="px-2 py-2.5 text-center">
                             <button
-                              onClick={() => deleteTask(task.id)}
-                              className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer"
-                              title="Excluir tarefa"
+                              type="button"
+                              onClick={() => setTaskToDelete(task.id)}
+                              className="text-[var(--text-muted)] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer rounded-md hover:bg-rose-500/10"
+                              title="Excluir demanda"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -677,13 +765,13 @@ export const TableView: React.FC = () => {
                     })}
 
                     {/* Inline + Adicionar tarefa row */}
-                    <tr className="bg-[#141720]/70 hover:bg-[#181c26] transition-colors">
-                      <td className="px-3 py-2 text-center text-slate-500">+</td>
+                    <tr className="bg-[var(--bg-canvas)]/40 hover:bg-[var(--bg-canvas)] transition-colors">
+                      <td className="px-3 py-2 text-center text-[var(--text-muted)]">+</td>
                       <td colSpan={10 + customColumns.length} className="px-3 py-2">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center gap-2">
                           <input
                             type="text"
-                            placeholder="+ Adicionar tarefa..."
+                            placeholder="+ Adicionar demanda ao grupo..."
                             value={newTaskTitles[group.id] || ''}
                             onChange={(e) =>
                               setNewTaskTitles((prev) => ({ ...prev, [group.id]: e.target.value }))
@@ -693,15 +781,16 @@ export const TableView: React.FC = () => {
                                 handleInlineAddTask(group.id);
                               }
                             }}
-                            className="w-full bg-transparent text-slate-300 placeholder-slate-500 outline-none text-xs"
+                            className="w-full bg-transparent text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none text-xs"
                           />
                           {(newTaskTitles[group.id] || '').trim().length > 0 && (
-                            <button
+                            <Button
+                              variant="primary"
+                              size="xs"
                               onClick={() => handleInlineAddTask(group.id)}
-                              className="px-2.5 py-1 bg-[#0073ea] text-white rounded text-[11px] font-semibold shrink-0 cursor-pointer"
                             >
                               Salvar
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -711,21 +800,22 @@ export const TableView: React.FC = () => {
                   {/* Group Summary Row */}
                   {totalCount > 0 && (
                     <tfoot>
-                      <tr className="border-t border-[#212633] bg-[#141720] text-[10px] text-slate-400">
+                      <tr className="border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[11px] text-[var(--text-muted)]">
                         <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2 font-medium">Resumo do grupo</td>
+                        <td className="px-3 py-2 font-medium">Resumo ({totalCount})</td>
                         <td className="px-2 py-2"></td>
 
                         {!hiddenColumns.includes('assignee') && (
-                          <td className="px-3 py-2 text-center font-mono tabular-nums">{totalCount} atribuições</td>
+                          <td className="px-3 py-2 text-center font-mono tabular-nums">{totalCount} membros</td>
                         )}
 
                         {!hiddenColumns.includes('status') && (
                           <td className="px-3 py-2 text-center">
-                            <div className="w-28 mx-auto h-3 rounded-[3px] overflow-hidden flex bg-[#1e2330] border border-[#272e3d]">
+                            <div className="w-28 mx-auto h-2.5 rounded-full overflow-hidden flex bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)]">
                               {Object.entries(statusCounts).map(([st, cnt]) => {
                                 const pct = Math.round((cnt / totalCount) * 100);
-                                const color = STATUS_CONFIG[st]?.bg || '#579bfc';
+                                const isDone = st === 'Pronto';
+                                const color = isDone ? '#10b981' : st === 'Parado' ? '#ef4444' : '#0066ff';
                                 return (
                                   <div
                                     key={st}
@@ -740,33 +830,25 @@ export const TableView: React.FC = () => {
                         )}
 
                         {!hiddenColumns.includes('dueDate') && (
-                          <td className="px-3 py-2 text-center font-mono tabular-nums">
-                            {totalCount} prazos
-                          </td>
+                          <td className="px-3 py-2 text-center font-mono tabular-nums">{totalCount} prazos</td>
                         )}
 
                         {!hiddenColumns.includes('priority') && (
-                          <td className="px-3 py-2 text-center">
-                            <div className="w-20 mx-auto h-2 bg-[#202533] rounded-full overflow-hidden">
-                              <div className="h-full bg-indigo-500 w-3/4" />
-                            </div>
-                          </td>
+                          <td className="px-3 py-2 text-center font-mono text-[10px]">prioridades</td>
                         )}
 
                         {!hiddenColumns.includes('timeline') && (
-                          <td className="px-3 py-2 text-center font-mono text-[9px]">
-                            Cronograma ativo
-                          </td>
+                          <td className="px-3 py-2 text-center font-mono text-[10px]">ativo</td>
                         )}
 
                         {!hiddenColumns.includes('integrations') && (
-                          <td className="px-3 py-2 text-center text-emerald-400 font-mono text-[10px]">
-                            Fluxos integrados
+                          <td className="px-3 py-2 text-center text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">
+                            conectado
                           </td>
                         )}
 
                         {customColumns.map((c) => (
-                          <td key={c.id} className="px-3 py-2 text-center text-slate-500 font-mono text-[10px]">
+                          <td key={c.id} className="px-3 py-2 text-center text-[var(--text-muted)] font-mono text-[10px]">
                             -
                           </td>
                         ))}
@@ -782,10 +864,20 @@ export const TableView: React.FC = () => {
         );
       })}
 
+      {displayGroups.length === 0 && (
+        <EmptyState
+          icon={Layers}
+          title="Nenhuma demanda encontrada"
+          description="Nenhuma tarefa corresponde aos filtros ou busca selecionados no momento."
+          actionLabel="Limpar Filtros"
+          onAction={() => {}}
+        />
+      )}
+
       {/* + Adicionar novo grupo */}
       <div className="pt-1">
         {isAddingGroup ? (
-          <div className="flex items-center space-x-2 bg-[#171a24] border border-[#272e3d] p-2.5 rounded-md max-w-md">
+          <div className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-2.5 rounded-xl max-w-md shadow-xs">
             <input
               type="text"
               autoFocus
@@ -795,42 +887,38 @@ export const TableView: React.FC = () => {
                 if (e.key === 'Enter') handleCreateGroup();
                 if (e.key === 'Escape') setIsAddingGroup(false);
               }}
-              placeholder="Nome do novo grupo (ex: Engenharia Backend)..."
-              className="bg-[#1f2430] text-slate-200 px-3 py-1.5 rounded border border-[#2b3243] outline-none text-xs flex-1"
+              placeholder="Nome do grupo (ex: Engenharia Backend)..."
+              className="bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs flex-1 focus:border-[#0066ff]"
             />
-            <button
-              onClick={handleCreateGroup}
-              className="px-3 py-1.5 bg-[#0073ea] text-white rounded text-xs font-semibold hover:bg-blue-600 cursor-pointer"
-            >
+            <Button variant="primary" size="sm" onClick={handleCreateGroup}>
               Criar grupo
-            </button>
-            <button
-              onClick={() => setIsAddingGroup(false)}
-              className="px-2 py-1.5 text-slate-400 hover:text-white text-xs cursor-pointer"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setIsAddingGroup(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setIsAddingGroup(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-[#171a24] hover:bg-[#1e2330] border border-[#272e3d] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+            leftIcon={<Plus className="w-3.5 h-3.5 text-[#0066ff]" />}
           >
-            <Plus className="w-3.5 h-3.5 text-blue-400" />
-            <span>Adicionar novo grupo</span>
-          </button>
+            Adicionar novo grupo de demandas
+          </Button>
         )}
       </div>
 
       {/* Add Custom Column Modal */}
       {isAddColumnOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none">
-          <div className="w-full max-w-sm bg-[#161922] border border-[#272e3d] rounded-xl shadow-2xl p-5 space-y-4">
+          <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-white text-sm">Adicionar Nova Coluna</h3>
+              <h3 className="font-bold text-[var(--text-primary)] text-sm">Adicionar Nova Coluna</h3>
               <button
+                type="button"
                 onClick={() => setIsAddColumnOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-md"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -838,23 +926,23 @@ export const TableView: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Título da Coluna:</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Título da Coluna:</label>
                 <input
                   type="text"
                   autoFocus
                   value={newColTitle}
                   onChange={(e) => setNewColTitle(e.target.value)}
                   placeholder="ex: Estimativa (Horas), PR Link, Tags..."
-                  className="w-full bg-[#1e2330] text-slate-200 px-3 py-1.5 rounded border border-[#2a3140] outline-none text-xs"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[#0066ff]"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Tipo de Dado:</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Tipo de Dado:</label>
                 <select
                   value={newColType}
                   onChange={(e) => setNewColType(e.target.value as CustomColumn['type'])}
-                  className="w-full bg-[#1e2330] text-slate-200 px-3 py-1.5 rounded border border-[#2a3140] outline-none text-xs cursor-pointer"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
                 >
                   <option value="text">Texto Livre</option>
                   <option value="number">Número / Horas</option>
@@ -864,23 +952,45 @@ export const TableView: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-end space-x-2 text-xs">
-              <button
-                onClick={() => setIsAddColumnOpen(false)}
-                className="px-3 py-1.5 rounded text-slate-400 hover:text-white cursor-pointer"
-              >
+            <div className="pt-2 flex items-center justify-end gap-2 text-xs">
+              <Button variant="ghost" size="sm" onClick={() => setIsAddColumnOpen(false)}>
                 Cancelar
-              </button>
-              <button
-                onClick={handleCreateColumn}
-                className="px-4 py-1.5 rounded bg-[#0073ea] hover:bg-blue-600 text-white font-semibold cursor-pointer"
-              >
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleCreateColumn}>
                 Criar Coluna
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          if (taskToDelete) {
+            deleteTask(taskToDelete);
+            setTaskToDelete(null);
+          }
+        }}
+        title="Excluir Demanda"
+        description="Tem certeza de que deseja excluir esta demanda? Esta ação não pode ser desfeita e removerá os dados vinculados."
+        confirmText="Excluir"
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isBulkDeleteOpen}
+        onClose={() => setIsBulkDeleteOpen(false)}
+        onConfirm={() => {
+          bulkDeleteTasks();
+          setIsBulkDeleteOpen(false);
+        }}
+        title={`Excluir ${selectedTaskIds.length} Demandas`}
+        description={`Tem certeza de que deseja excluir todas as ${selectedTaskIds.length} demandas selecionadas?`}
+        confirmText="Excluir Selecionadas"
+      />
     </div>
   );
 };

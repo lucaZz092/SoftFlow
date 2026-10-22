@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import {
   ChevronDown,
   Sparkles,
@@ -10,10 +11,12 @@ import {
   Kanban,
   Calendar,
   BarChart2,
-  Plus
+  Plus,
+  Compass,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { ViewType } from '../types';
+import { Button } from './ui/Button';
 
 export const BoardHeader: React.FC = () => {
   const {
@@ -28,105 +31,133 @@ export const BoardHeader: React.FC = () => {
   const activeAutomationsCount = automations.filter((a) => a.enabled).length;
 
   const views: { id: ViewType; label: string; icon: React.ReactNode }[] = [
-    { id: 'table', label: 'Quadro principal', icon: <Table className="w-3.5 h-3.5" /> },
-    { id: 'kanban', label: 'Kanban', icon: <Kanban className="w-3.5 h-3.5" /> },
+    { id: 'overview', label: 'Visão Geral', icon: <Compass className="w-3.5 h-3.5" /> },
+    { id: 'table', label: 'Quadro Principal', icon: <Table className="w-3.5 h-3.5" /> },
+    { id: 'kanban', label: 'Kanban Ágil', icon: <Kanban className="w-3.5 h-3.5" /> },
     { id: 'timeline', label: 'Cronograma', icon: <Calendar className="w-3.5 h-3.5" /> },
     { id: 'automations', label: 'Automações de Fluxo', icon: <Workflow className="w-3.5 h-3.5" /> },
     { id: 'metrics', label: 'Painéis e Métricas', icon: <BarChart2 className="w-3.5 h-3.5" /> },
   ];
 
   return (
-    <div className="border-b border-[#212633] bg-[#161922] select-none pt-3 px-5 pb-0">
+    <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] select-none pt-3 px-3 sm:px-5 transition-colors">
       {/* Top Row: Board Title and Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
         {/* Title dropdown */}
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1.5 text-lg font-bold text-white tracking-tight cursor-pointer hover:text-slate-200 transition-colors">
-            <span>SoftSolutions</span>
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight cursor-pointer hover:opacity-85 transition-opacity">
+            <span className="truncate">SoftSolutions</span>
+            <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
           </div>
-          <span className="text-slate-500 text-xs" aria-hidden="true">·</span>
-          <span className="text-xs text-slate-400 font-medium">Gestão de Demandas &amp; Engenharia</span>
+          <span className="text-[var(--text-muted)] text-xs hidden sm:inline" aria-hidden="true">·</span>
+          <span className="text-xs text-[var(--text-secondary)] font-medium hidden sm:inline truncate">
+            Gestão de Demandas &amp; Engenharia
+          </span>
         </div>
 
         {/* Right buttons */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           {/* Sugestão de IA */}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setIsAiModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-200 hover:text-white bg-[#1e2330] hover:bg-[#262c3b] border border-[#2b3243] transition-colors whitespace-nowrap cursor-pointer"
+            leftIcon={<Sparkles className="w-3.5 h-3.5 text-[#0066ff]" />}
+            className="cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            <span>Sugestões de IA</span>
-          </button>
+            <span className="hidden sm:inline">Sugestões de</span> IA
+          </Button>
 
           {/* Integrar */}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setIsIntegrationsOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-200 hover:text-white bg-[#1e2330] hover:bg-[#262c3b] border border-[#2b3243] transition-colors whitespace-nowrap cursor-pointer"
+            leftIcon={<Link2 className="w-3.5 h-3.5 text-emerald-500" />}
             title="GitHub, Claude, Codex"
           >
-            <Link2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Integrar</span>
-          </button>
+            Integrar
+          </Button>
 
           {/* Automatizar */}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setCurrentView('automations')}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-200 hover:text-white bg-[#1e2330] hover:bg-[#262c3b] border border-[#2b3243] transition-colors whitespace-nowrap cursor-pointer"
+            leftIcon={<Workflow className="w-3.5 h-3.5 text-amber-500" />}
+            rightIcon={
+              activeAutomationsCount > 0 ? (
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-blue-500/10 text-[#0066ff] font-bold">
+                  {activeAutomationsCount}
+                </span>
+              ) : undefined
+            }
           >
-            <Workflow className="w-3.5 h-3.5 text-amber-400" />
-            <span>Automatizar</span>
-            {activeAutomationsCount > 0 && (
-              <span className="text-[11px] font-mono tabular-nums text-blue-400 font-bold ml-0.5">
-                ({activeAutomationsCount})
-              </span>
-            )}
-          </button>
+            Automatizar
+          </Button>
 
           {/* Agents */}
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setIsIntegrationsOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-200 hover:text-white bg-[#1e2330] hover:bg-[#262c3b] border border-[#2b3243] transition-colors whitespace-nowrap cursor-pointer"
+            leftIcon={<Bot className="w-3.5 h-3.5 text-indigo-500" />}
+            className="hidden md:inline-flex"
           >
-            <Bot className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Agentes</span>
-          </button>
+            Agentes
+          </Button>
 
           {/* Convidar */}
-          <button className="flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-medium bg-[#1e2330] hover:bg-[#262c3b] text-slate-200 border border-[#2b3243] transition-colors whitespace-nowrap cursor-pointer">
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Convidar</span>
-          </button>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<UserPlus className="w-3.5 h-3.5" />}
+            className="hidden lg:inline-flex"
+          >
+            Convidar
+          </Button>
         </div>
       </div>
 
-      {/* Bottom Row: View Tabs */}
-      <div className="flex items-center space-x-1 overflow-x-auto scrollbar-none pt-0.5">
+      {/* Bottom Row: View Tabs with Linear-style Active Indicator */}
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pt-0.5 relative">
         {views.map((v) => {
           const isActive = currentView === v.id;
           return (
             <button
               key={v.id}
+              type="button"
               onClick={() => setCurrentView(v.id)}
-              className={`flex items-center space-x-2 px-3 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`relative flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 rounded-t-md ${
                 isActive
-                  ? 'border-[#0073ea] text-white font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#1a1e28]'
+                  ? 'text-[var(--text-primary)] font-semibold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]'
               }`}
             >
-              {v.icon}
+              <span className={isActive ? 'text-[#0066ff]' : 'text-current opacity-70'}>
+                {v.icon}
+              </span>
               <span>{v.label}</span>
+
+              {isActive && (
+                <motion.div
+                  layoutId="activeTabUnderline"
+                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0066ff]"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
             </button>
           );
         })}
 
         <button
+          type="button"
           onClick={() => setIsNewAutomationOpen(true)}
-          className="flex items-center space-x-1 px-2.5 py-2 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+          className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] rounded-md transition-colors cursor-pointer ml-1"
           title="Nova automação"
+          aria-label="Criar nova automação"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-4 h-4" />
         </button>
       </div>
     </div>

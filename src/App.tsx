@@ -4,6 +4,7 @@ import { NavigationSidebar } from './components/NavigationSidebar';
 import { TopBar } from './components/TopBar';
 import { BoardHeader } from './components/BoardHeader';
 import { BoardToolbar } from './components/BoardToolbar';
+import { OverviewView } from './components/OverviewView';
 import { TableView } from './components/TableView';
 import { KanbanView } from './components/KanbanView';
 import { TimelineView } from './components/TimelineView';
@@ -19,7 +20,7 @@ const AppContent: React.FC = () => {
   const { currentView } = useProject();
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#12141a] text-slate-100 font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)] font-sans transition-colors duration-150">
       {/* Left Navigation Bar (Monday style icon rail + workspace drawer) */}
       <NavigationSidebar />
 
@@ -38,6 +39,7 @@ const AppContent: React.FC = () => {
 
         {/* Dynamic Views */}
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          {currentView === 'overview' && <OverviewView />}
           {currentView === 'table' && <TableView />}
           {currentView === 'kanban' && <KanbanView />}
           {currentView === 'timeline' && <TimelineView />}

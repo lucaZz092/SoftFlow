@@ -1,28 +1,98 @@
 @import "tailwindcss";
 
+:root {
+  /* Dark Theme Tokens (Default) */
+  --bg-canvas: #0f1218;
+  --bg-sidebar: #131720;
+  --bg-surface: #171b26;
+  --bg-subtle: #1c212e;
+  --bg-hover: #222838;
+  --bg-elevated: #1f2533;
+  --border-subtle: #252b3b;
+  --border-strong: #323a4f;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-primary: #0066ff;
+  --accent-hover: #0052cc;
+  --accent-subtle: rgba(0, 102, 255, 0.12);
+  --ring-color: #0066ff;
+  --scrollbar-thumb: #2b3240;
+  --scrollbar-thumb-hover: #3b4457;
+  --scrollbar-track: #131720;
+}
+
+:root.light {
+  /* Light Theme Tokens */
+  --bg-canvas: #f8fafc;
+  --bg-sidebar: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --accent-primary: #0066ff;
+  --accent-hover: #0052cc;
+  --accent-subtle: rgba(0, 102, 255, 0.08);
+  --ring-color: #0066ff;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-track: #f1f5f9;
+}
+
 @layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #12141a;
-    color: #f1f5f9;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  /* Custom enterprise dark scrollbar */
+  /* Accessible focus rings */
+  :focus-visible {
+    outline: 2px solid var(--ring-color);
+    outline-offset: 1px;
+  }
+
+  /* Custom enterprise scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #14171f;
+    background: var(--scrollbar-track);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2b3240;
-    border-radius: 3px;
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3b4457;
+    background: var(--scrollbar-thumb-hover);
   }
 }
+
+/* Custom helper utilities for semantic colors */
+.bg-canvas { background-color: var(--bg-canvas); }
+.bg-sidebar { background-color: var(--bg-sidebar); }
+.bg-surface { background-color: var(--bg-surface); }
+.bg-subtle { background-color: var(--bg-subtle); }
+.bg-hover { background-color: var(--bg-hover); }
+.bg-elevated { background-color: var(--bg-elevated); }
+
+.border-subtle { border-color: var(--border-subtle); }
+.border-strong { border-color: var(--border-strong); }
+
+.text-primary-theme { color: var(--text-primary); }
+.text-secondary-theme { color: var(--text-secondary); }
+.text-muted-theme { color: var(--text-muted); }

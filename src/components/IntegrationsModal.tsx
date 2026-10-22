@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
   GitBranch,
@@ -10,6 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { Button } from './ui/Button';
 
 export const IntegrationsModal: React.FC = () => {
   const {
@@ -30,6 +32,16 @@ export const IntegrationsModal: React.FC = () => {
   const [claudeModel, setClaudeModel] = useState('claude-3-5-sonnet');
   const [codexFramework, setCodexFramework] = useState('vitest');
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isIntegrationsOpen) {
+        setIsIntegrationsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isIntegrationsOpen, setIsIntegrationsOpen]);
+
   if (!isIntegrationsOpen) return null;
 
   const handleTestToken = async () => {
@@ -39,63 +51,86 @@ export const IntegrationsModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs select-none p-4">
-      <div className="w-full max-w-xl bg-[#161922] border border-[#242936] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsIntegrationsOpen(false)}
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+        className="relative w-full max-w-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden flex flex-col z-10"
+      >
         {/* Modal Header */}
-        <div className="p-4 border-b border-[#212633] bg-[#141720] flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <GitBranch className="w-3.5 h-3.5" />
+        <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+              <GitBranch className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Configurações de Integração</h2>
-              <p className="text-[11px] text-slate-400">GitHub (PAT Autenticado), Claude 3.5 Sonnet &amp; Codex Engine</p>
+              <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                Configurações de Integração
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                GitHub (PAT Autenticado), Claude 3.5 Sonnet &amp; Codex Engine
+              </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => setIsIntegrationsOpen(false)}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#1e2330] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+            aria-label="Fechar"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Selectors */}
-        <div className="flex border-b border-[#212633] bg-[#141720] px-4 text-xs font-medium">
+        <div className="flex border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 px-4 text-xs font-medium overflow-x-auto scrollbar-none">
           <button
+            type="button"
             onClick={() => setActiveTab('github')}
-            className={`flex items-center space-x-1.5 py-2.5 px-3 border-b-2 transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'github'
-                ? 'border-purple-500 text-purple-300 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-white'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400 font-semibold'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <GitBranch className="w-3.5 h-3.5 text-purple-400" />
-            <span>GitHub (Token Pessoal PAT)</span>
+            <GitBranch className="w-3.5 h-3.5 text-purple-500" />
+            <span>GitHub (Token PAT)</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('claude')}
-            className={`flex items-center space-x-1.5 py-2.5 px-3 border-b-2 transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'claude'
-                ? 'border-indigo-500 text-indigo-300 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-white'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Bot className="w-3.5 h-3.5 text-indigo-400" />
+            <Bot className="w-3.5 h-3.5 text-indigo-500" />
             <span>Claude (Refinamento)</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('codex')}
-            className={`flex items-center space-x-1.5 py-2.5 px-3 border-b-2 transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'codex'
-                ? 'border-amber-500 text-amber-300 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-white'
+                ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-semibold'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
             <span>Codex (Testes)</span>
           </button>
         </div>
@@ -104,96 +139,105 @@ export const IntegrationsModal: React.FC = () => {
         <div className="p-5 overflow-y-auto space-y-4 text-xs">
           {/* TAB 1: GitHub */}
           {activeTab === 'github' && (
-            <div className="space-y-3.5">
-              <div className={`flex items-center justify-between p-3 rounded-lg border ${
-                isGithubConnected
-                  ? 'bg-purple-950/20 border-purple-500/30'
-                  : 'bg-rose-950/20 border-rose-500/30'
-              }`}>
-                <div className="flex items-center space-x-2.5">
+            <div className="space-y-4">
+              <div
+                className={`flex items-center justify-between p-3.5 rounded-xl border ${
+                  isGithubConnected
+                    ? 'bg-purple-500/10 border-purple-500/30'
+                    : 'bg-rose-500/10 border-rose-500/30'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
                   {isGithubConnected ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
                   )}
                   <div>
-                    <div className="font-semibold text-white">
+                    <div className="font-semibold text-[var(--text-primary)]">
                       {isGithubConnected ? 'Autenticado via GitHub PAT' : 'Token não validado'}
                     </div>
-                    <div className="text-[11px] text-slate-400">
-                      {isGithubConnected ? `Usuário: ${githubUser}` : 'Insira o token para sincronizar branches e PRs'}
+                    <div className="text-xs text-[var(--text-muted)]">
+                      {isGithubConnected
+                        ? `Usuário autenticado: ${githubUser}`
+                        : 'Insira o token para sincronizar branches e PRs'}
                     </div>
                   </div>
                 </div>
-                <span className={`text-[10px] font-bold uppercase ${
-                  isGithubConnected ? 'text-emerald-400' : 'text-rose-400'
-                }`}>
+                <span
+                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                    isGithubConnected
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                  }`}
+                >
                   {isGithubConnected ? 'CONECTADO' : 'PENDENTE'}
                 </span>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1 flex items-center space-x-1">
-                    <Key className="w-3 h-3 text-amber-400" />
+                  <label className="block text-[var(--text-primary)] font-semibold mb-1.5 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-amber-500" />
                     <span>Token de Acesso Pessoal (PAT):</span>
                   </label>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <input
                       type="password"
                       value={tempToken}
                       onChange={(e) => setTempToken(e.target.value)}
                       placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="flex-1 bg-[#1b1f2b] text-slate-200 px-3 py-1.5 rounded border border-[#272e3d] outline-none font-mono text-xs"
+                      className="flex-1 bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[#0066ff]"
                     />
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={handleTestToken}
-                      disabled={isTesting}
-                      className="px-3 py-1.5 bg-[#0073ea] hover:bg-blue-600 disabled:opacity-50 text-white rounded font-medium transition-colors cursor-pointer shrink-0"
+                      isLoading={isTesting}
                     >
-                      {isTesting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        'Testar & Salvar'
-                      )}
-                    </button>
+                      Testar &amp; Salvar
+                    </Button>
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
+                  <span className="text-[11px] text-[var(--text-muted)] mt-1.5 block">
                     Permissões requeridas: `repo` (leitura/escrita de branches, commits e pull requests).
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-medium mb-1">Repositório GitHub Alvo:</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">
+                    Repositório GitHub Alvo:
+                  </label>
                   <input
                     type="text"
                     value={githubRepo}
                     onChange={(e) => setGithubRepo(e.target.value)}
-                    className="w-full bg-[#1b1f2b] text-slate-200 px-3 py-1.5 rounded border border-[#272e3d] outline-none font-mono text-xs"
+                    className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[#0066ff]"
                   />
                 </div>
 
-                <div className="p-3 rounded-lg bg-[#181b24] border border-[#232835] space-y-2">
-                  <div className="text-[11px] font-semibold text-slate-300">Testar Disparo de Eventos:</div>
-                  <div className="flex items-center space-x-2">
-                    <button
+                <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2.5">
+                  <div className="text-xs font-semibold text-[var(--text-primary)]">Testar Disparo de Eventos:</div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         simulateGitHubEvent('PR_MERGED');
                         setIsIntegrationsOpen(false);
                       }}
-                      className="px-3 py-1 rounded bg-[#202533] hover:bg-[#272e3e] text-purple-300 font-medium transition-colors cursor-pointer"
                     >
                       Simular PR Merged
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         simulateGitHubEvent('PR_OPENED');
                         setIsIntegrationsOpen(false);
                       }}
-                      className="px-3 py-1 rounded bg-[#202533] hover:bg-[#272e3e] text-emerald-300 font-medium transition-colors cursor-pointer"
                     >
                       Simular Novo PR
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -202,23 +246,27 @@ export const IntegrationsModal: React.FC = () => {
 
           {/* TAB 2: Claude */}
           {activeTab === 'claude' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#181b24] border border-indigo-500/30">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
                 <div>
-                  <div className="font-semibold text-white">Claude 3.5 Sonnet Configurado</div>
-                  <div className="text-[11px] text-slate-400">Geração de critérios de aceite e refinamento de histórias</div>
+                  <div className="font-semibold text-[var(--text-primary)]">Claude 3.5 Sonnet Configurado</div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Geração de critérios de aceite e refinamento de histórias
+                  </div>
                 </div>
-                <span className="text-[10px] text-indigo-400 font-bold uppercase">
+                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase bg-indigo-500/20 px-2 py-0.5 rounded-full">
                   PRONTO
                 </span>
               </div>
 
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Modelo de Linguagem:</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1.5">
+                  Modelo de Linguagem:
+                </label>
                 <select
                   value={claudeModel}
                   onChange={(e) => setClaudeModel(e.target.value)}
-                  className="w-full bg-[#1b1f2b] text-slate-200 px-3 py-1.5 rounded border border-[#272e3d] outline-none text-xs cursor-pointer"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
                 >
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Padrão para Engenharia)</option>
                   <option value="claude-3-haiku">Claude 3.5 Haiku (Respostas Rápidas)</option>
@@ -229,23 +277,27 @@ export const IntegrationsModal: React.FC = () => {
 
           {/* TAB 3: Codex */}
           {activeTab === 'codex' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#181b24] border border-amber-500/30">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <div>
-                  <div className="font-semibold text-white">Codex Test Runner</div>
-                  <div className="text-[11px] text-slate-400">Geração automática de suítes de testes unitários</div>
+                  <div className="font-semibold text-[var(--text-primary)]">Codex Test Runner</div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Geração automática de suítes de testes unitários
+                  </div>
                 </div>
-                <span className="text-[10px] text-amber-400 font-bold uppercase">
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase bg-amber-500/20 px-2 py-0.5 rounded-full">
                   PRONTO
                 </span>
               </div>
 
               <div>
-                <label className="block text-slate-400 font-medium mb-1">Framework de Teste:</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1.5">
+                  Framework de Teste:
+                </label>
                 <select
                   value={codexFramework}
                   onChange={(e) => setCodexFramework(e.target.value)}
-                  className="w-full bg-[#1b1f2b] text-slate-200 px-3 py-1.5 rounded border border-[#272e3d] outline-none text-xs cursor-pointer"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
                 >
                   <option value="vitest">Vitest / Testing Library</option>
                   <option value="jest">Jest</option>
@@ -257,15 +309,12 @@ export const IntegrationsModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-3.5 border-t border-[#212633] bg-[#141720] flex items-center justify-end">
-          <button
-            onClick={() => setIsIntegrationsOpen(false)}
-            className="px-3.5 py-1.5 rounded bg-[#0073ea] hover:bg-[#0062c7] text-white font-semibold text-xs transition-colors cursor-pointer"
-          >
+        <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-end">
+          <Button variant="primary" size="sm" onClick={() => setIsIntegrationsOpen(false)}>
             Concluir
-          </button>
+          </Button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

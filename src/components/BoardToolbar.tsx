@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   ChevronDown,
@@ -11,10 +11,11 @@ import {
   GitPullRequest,
   CheckCircle2,
   X,
-  Check
+  Check,
 } from 'lucide-react';
 import { useProject, SortField, GroupByOption } from '../context/ProjectContext';
 import { TEAM_MEMBERS } from '../data/mockData';
+import { Button } from './ui/Button';
 
 export const BoardToolbar: React.FC = () => {
   const {
@@ -44,9 +45,27 @@ export const BoardToolbar: React.FC = () => {
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
   const [showSimulateDropdown, setShowSimulateDropdown] = useState(false);
 
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setShowPersonDropdown(false);
+        setShowFilterDropdown(false);
+        setShowSortDropdown(false);
+        setShowHideDropdown(false);
+        setShowGroupDropdown(false);
+        setShowSimulateDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleCreateTask = () => {
     const targetGroup = groups[0] || { id: 'group-marketing' };
-    addTask(targetGroup.id, 'Nova Tarefa');
+    addTask(targetGroup.id, 'Nova Demanda');
   };
 
   const hasActiveFilters = Boolean(filterStatus || filterPriority || filterAssigneeId || searchQuery || sortBy);
@@ -69,40 +88,49 @@ export const BoardToolbar: React.FC = () => {
   ];
 
   return (
-    <div className="h-11 border-b border-[#212633] bg-[#141720] px-5 flex items-center justify-between text-xs select-none">
+    <div
+      ref={toolbarRef}
+      className="min-h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 sm:px-5 flex flex-wrap items-center justify-between gap-2 text-xs select-none transition-colors py-1.5"
+    >
       {/* Left controls */}
-      <div className="flex items-center space-x-2">
-        {/* Criar tarefa */}
-        <div className="flex items-center rounded overflow-hidden shadow-xs">
-          <button
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        {/* Criar demanda */}
+        <div className="flex items-center rounded-lg overflow-hidden shadow-xs border border-transparent">
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleCreateTask}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#0073ea] hover:bg-[#0062c7] text-white font-semibold transition-colors cursor-pointer"
+            leftIcon={<Plus className="w-3.5 h-3.5" />}
+            className="rounded-r-none font-semibold"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Criar tarefa</span>
-          </button>
-          <button
+            Criar demanda
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleCreateTask}
-            className="px-1.5 py-1.5 bg-[#0062c7] hover:bg-[#0052a6] text-white transition-colors cursor-pointer border-l border-white/20"
+            className="rounded-l-none border-l border-white/20 px-2 min-h-[30px]"
+            aria-label="Opções de criação"
           >
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
+            <ChevronDown className="w-3 h-3" />
+          </Button>
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Pesquisar..."
-            className="bg-[#1b1f2b] hover:bg-[#202533] focus:bg-[#202533] text-slate-200 placeholder-slate-400 pl-8 pr-6 py-1 rounded border border-[#272e3d] focus:border-[#0073ea] outline-none transition-all w-32 focus:w-48 text-xs"
+            placeholder="Filtrar por nome..."
+            className="bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] focus:bg-[var(--bg-canvas)] text-[var(--text-primary)] placeholder-[var(--text-muted)] pl-8 pr-6 py-1 rounded-lg border border-[var(--border-subtle)] focus:border-[#0066ff] outline-none transition-all w-28 sm:w-36 focus:w-48 text-xs"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             >
               <X className="w-3 h-3" />
             </button>
@@ -111,82 +139,99 @@ export const BoardToolbar: React.FC = () => {
 
         {/* Pessoa filter */}
         <div className="relative">
-          <button
-            onClick={() => setShowPersonDropdown(!showPersonDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
-              filterAssigneeId ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
-            }`}
+          <Button
+            variant={filterAssigneeId ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowPersonDropdown(!showPersonDropdown);
+              setShowFilterDropdown(false);
+              setShowSortDropdown(false);
+              setShowHideDropdown(false);
+              setShowGroupDropdown(false);
+              setShowSimulateDropdown(false);
+            }}
+            leftIcon={<User className="w-3.5 h-3.5" />}
           >
-            <User className="w-3.5 h-3.5 text-slate-400" />
-            <span>Pessoa</span>
-          </button>
+            Pessoa
+          </Button>
 
           {showPersonDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-48 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1 z-30">
+            <div className="absolute left-0 top-full mt-1.5 w-52 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-30 space-y-0.5">
               <button
+                type="button"
                 onClick={() => {
                   setFilterAssigneeId(null);
                   setShowPersonDropdown(false);
                 }}
-                className="w-full px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-300 cursor-pointer flex items-center justify-between text-left text-xs"
+                className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center justify-between text-left text-xs transition-colors"
               >
                 <span>Todos os membros</span>
-                {!filterAssigneeId && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />}
+                {!filterAssigneeId && <CheckCircle2 className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
               {TEAM_MEMBERS.map((m) => (
                 <button
+                  type="button"
                   key={m.id}
                   onClick={() => {
                     setFilterAssigneeId(m.id);
                     setShowPersonDropdown(false);
                   }}
-                  className="w-full px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-300 cursor-pointer flex items-center justify-between text-left text-xs"
+                  className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center justify-between text-left text-xs transition-colors"
                 >
-                  <div className="flex items-center space-x-2 truncate">
+                  <div className="flex items-center gap-2 truncate">
                     <span
-                      className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0"
+                      className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center shrink-0 shadow-xs"
                       style={{ backgroundColor: m.color }}
                     >
                       {m.initials}
                     </span>
                     <span className="truncate">{m.name}</span>
                   </div>
-                  {filterAssigneeId === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                  {filterAssigneeId === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-[#0066ff] shrink-0" />}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Filtro */}
+        {/* Filtros */}
         <div className="relative">
-          <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
-              filterStatus || filterPriority ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
-            }`}
+          <Button
+            variant={filterStatus || filterPriority ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowFilterDropdown(!showFilterDropdown);
+              setShowPersonDropdown(false);
+              setShowSortDropdown(false);
+              setShowHideDropdown(false);
+              setShowGroupDropdown(false);
+              setShowSimulateDropdown(false);
+            }}
+            leftIcon={<Filter className="w-3.5 h-3.5" />}
+            rightIcon={<ChevronDown className="w-3 h-3" />}
           >
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span>Filtros</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
+            Filtros
+          </Button>
 
           {showFilterDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-56 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-2.5 z-30 space-y-2.5">
+            <div className="absolute left-0 top-full mt-1.5 w-60 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-3 z-30 space-y-3">
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                  Status
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+                  Por Status
                 </span>
                 <div className="grid grid-cols-2 gap-1">
-                  {['Pronto', 'Em andamento', 'Parado', 'Em Revisão'].map((s) => (
+                  {['Pronto', 'Em andamento', 'Parado', 'Em Revisão', 'Trabalhando nisso'].map((s) => (
                     <button
+                      type="button"
                       key={s}
                       onClick={() => {
                         setFilterStatus(filterStatus === s ? null : s);
                         setShowFilterDropdown(false);
                       }}
-                      className={`px-2 py-1 rounded text-[11px] text-left transition-colors truncate cursor-pointer ${
-                        filterStatus === s ? 'bg-[#0073ea] text-white font-medium' : 'hover:bg-[#242b3a] text-slate-300'
+                      className={`px-2 py-1 rounded-md text-[11px] text-left transition-colors truncate cursor-pointer ${
+                        filterStatus === s
+                          ? 'bg-[#0066ff] text-white font-medium shadow-xs'
+                          : 'hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)]'
                       }`}
                     >
                       {s}
@@ -195,20 +240,23 @@ export const BoardToolbar: React.FC = () => {
                 </div>
               </div>
 
-              <div className="border-t border-[#262c3b] pt-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                  Prioridade
+              <div className="border-t border-[var(--border-subtle)] pt-2.5">
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+                  Por Prioridade
                 </span>
                 <div className="grid grid-cols-2 gap-1">
                   {['Crítica', 'Alta', 'Média', 'Baixa'].map((p) => (
                     <button
+                      type="button"
                       key={p}
                       onClick={() => {
                         setFilterPriority(filterPriority === p ? null : p);
                         setShowFilterDropdown(false);
                       }}
-                      className={`px-2 py-1 rounded text-[11px] text-left transition-colors truncate cursor-pointer ${
-                        filterPriority === p ? 'bg-[#0073ea] text-white font-medium' : 'hover:bg-[#242b3a] text-slate-300'
+                      className={`px-2 py-1 rounded-md text-[11px] text-left transition-colors truncate cursor-pointer ${
+                        filterPriority === p
+                          ? 'bg-[#0066ff] text-white font-medium shadow-xs'
+                          : 'hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)]'
                       }`}
                     >
                       {p}
@@ -222,60 +270,70 @@ export const BoardToolbar: React.FC = () => {
 
         {/* Ordenar */}
         <div className="relative">
-          <button
-            onClick={() => setShowSortDropdown(!showSortDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
-              sortBy ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
-            }`}
+          <Button
+            variant={sortBy ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowSortDropdown(!showSortDropdown);
+              setShowPersonDropdown(false);
+              setShowFilterDropdown(false);
+              setShowHideDropdown(false);
+              setShowGroupDropdown(false);
+              setShowSimulateDropdown(false);
+            }}
+            leftIcon={<ArrowUpDown className="w-3.5 h-3.5" />}
           >
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
             <span>Ordenar</span>
-            {sortBy && <span className="font-mono text-[10px]">({sortBy.field})</span>}
-          </button>
+            {sortBy && <span className="font-mono text-[10px] ml-1">({sortBy.field})</span>}
+          </Button>
 
           {showSortDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+            <div className="absolute left-0 top-full mt-1.5 w-56 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 block">
                 Ordenar Demandas Por:
               </span>
               <button
+                type="button"
                 onClick={() => {
                   setSortBy({ field: 'dueDate', direction: sortBy?.direction === 'asc' ? 'desc' : 'asc' });
                   setShowSortDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Prazo de Entrega</span>
-                {sortBy?.field === 'dueDate' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                {sortBy?.field === 'dueDate' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setSortBy({ field: 'priority', direction: 'desc' });
                   setShowSortDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
-                <span>Prioridade (Mais crítica)</span>
-                {sortBy?.field === 'priority' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                <span>Prioridade (Mais Crítica)</span>
+                {sortBy?.field === 'priority' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setSortBy({ field: 'title', direction: 'asc' });
                   setShowSortDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Título (A - Z)</span>
-                {sortBy?.field === 'title' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                {sortBy?.field === 'title' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
 
               {sortBy && (
                 <button
+                  type="button"
                   onClick={() => {
                     setSortBy(null);
                     setShowSortDropdown(false);
                   }}
-                  className="w-full text-left px-2.5 py-1.5 rounded hover:bg-rose-950/30 text-rose-300 text-xs border-t border-[#262c3b] mt-1 cursor-pointer"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 text-xs border-t border-[var(--border-subtle)] mt-1 cursor-pointer transition-colors"
                 >
                   Remover ordenação
                 </button>
@@ -286,32 +344,41 @@ export const BoardToolbar: React.FC = () => {
 
         {/* Ocultar Colunas */}
         <div className="relative">
-          <button
-            onClick={() => setShowHideDropdown(!showHideDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
-              hiddenColumns.length > 0 ? 'bg-amber-600/20 text-amber-400 border-amber-500/40' : 'border-transparent'
-            }`}
+          <Button
+            variant={hiddenColumns.length > 0 ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowHideDropdown(!showHideDropdown);
+              setShowPersonDropdown(false);
+              setShowFilterDropdown(false);
+              setShowSortDropdown(false);
+              setShowGroupDropdown(false);
+              setShowSimulateDropdown(false);
+            }}
+            leftIcon={<EyeOff className="w-3.5 h-3.5" />}
           >
-            <EyeOff className="w-3.5 h-3.5 text-slate-400" />
             <span>Ocultar</span>
-            {hiddenColumns.length > 0 && <span className="font-mono text-[10px]">({hiddenColumns.length})</span>}
-          </button>
+            {hiddenColumns.length > 0 && <span className="font-mono text-[10px] ml-1">({hiddenColumns.length})</span>}
+          </Button>
 
           {showHideDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+            <div className="absolute left-0 top-full mt-1.5 w-56 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 block">
                 Exibir / Ocultar Colunas:
               </span>
               {standardColumns.map((col) => {
                 const isHidden = hiddenColumns.includes(col.id);
                 return (
                   <button
+                    type="button"
                     key={col.id}
                     onClick={() => toggleColumnVisibility(col.id)}
-                    className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-xs flex items-center justify-between cursor-pointer transition-colors"
                   >
-                    <span className={isHidden ? 'text-slate-500 line-through' : 'text-slate-200'}>{col.label}</span>
-                    {!isHidden && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    <span className={isHidden ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}>
+                      {col.label}
+                    </span>
+                    {!isHidden && <Check className="w-3.5 h-3.5 text-emerald-500" />}
                   </button>
                 );
               })}
@@ -321,50 +388,59 @@ export const BoardToolbar: React.FC = () => {
 
         {/* Agrupar por */}
         <div className="relative">
-          <button
-            onClick={() => setShowGroupDropdown(!showGroupDropdown)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded hover:bg-[#1f2430] text-slate-300 transition-colors border cursor-pointer ${
-              groupBy !== 'group' ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'border-transparent'
-            }`}
+          <Button
+            variant={groupBy !== 'group' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowGroupDropdown(!showGroupDropdown);
+              setShowPersonDropdown(false);
+              setShowFilterDropdown(false);
+              setShowSortDropdown(false);
+              setShowHideDropdown(false);
+              setShowSimulateDropdown(false);
+            }}
+            leftIcon={<Layers className="w-3.5 h-3.5" />}
           >
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span>Agrupar</span>
-          </button>
+            Agrupar
+          </Button>
 
           {showGroupDropdown && (
-            <div className="absolute left-0 top-full mt-1 w-52 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-xl p-1.5 z-30 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 block">
+            <div className="absolute left-0 top-full mt-1.5 w-56 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-30 space-y-1">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 block">
                 Agrupar Demanda Por:
               </span>
               <button
+                type="button"
                 onClick={() => {
                   setGroupBy('group');
                   setShowGroupDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Grupos de Trabalho (Padrão)</span>
-                {groupBy === 'group' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                {groupBy === 'group' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setGroupBy('status');
                   setShowGroupDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Por Status</span>
-                {groupBy === 'status' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                {groupBy === 'status' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setGroupBy('assignee');
                   setShowGroupDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Por Responsável</span>
-                {groupBy === 'assignee' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                {groupBy === 'assignee' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
               </button>
             </div>
           )}
@@ -372,8 +448,9 @@ export const BoardToolbar: React.FC = () => {
 
         {hasActiveFilters && (
           <button
+            type="button"
             onClick={clearFilters}
-            className="text-[11px] text-rose-400 hover:text-rose-300 underline ml-2 cursor-pointer font-medium"
+            className="text-xs text-rose-500 hover:text-rose-600 underline ml-1 cursor-pointer font-medium"
           >
             Limpar filtros
           </button>
@@ -381,47 +458,57 @@ export const BoardToolbar: React.FC = () => {
       </div>
 
       {/* Right controls: Webhook Simulator button */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center gap-2">
         <div className="relative">
-          <button
-            onClick={() => setShowSimulateDropdown(!showSimulateDropdown)}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#1b1f2b] hover:bg-[#232938] border border-[#272e3d] text-emerald-400 font-medium transition-colors cursor-pointer"
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setShowSimulateDropdown(!showSimulateDropdown);
+              setShowPersonDropdown(false);
+              setShowFilterDropdown(false);
+              setShowSortDropdown(false);
+              setShowHideDropdown(false);
+              setShowGroupDropdown(false);
+            }}
+            leftIcon={<GitPullRequest className="w-3.5 h-3.5 text-emerald-500" />}
+            rightIcon={<ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />}
             title="Simular eventos em tempo real para disparar automações"
           >
-            <GitPullRequest className="w-3.5 h-3.5" />
-            <span className="text-[11px]">Simular Webhook</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
+            <span>Simular Webhook</span>
+          </Button>
 
           {showSimulateDropdown && (
-            <div className="absolute right-0 top-full mt-1 w-64 bg-[#1b1f2b] border border-[#2b3243] rounded-md shadow-2xl p-1.5 z-40 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 block">
-                Disparo de Automação:
+            <div className="absolute right-0 top-full mt-1.5 w-72 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-2 z-40 space-y-1.5">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 block">
+                Disparo em Tempo Real:
               </span>
               <button
+                type="button"
                 onClick={() => {
                   simulateGitHubEvent('PR_MERGED');
                   setShowSimulateDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-2 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center space-x-2 transition-colors cursor-pointer"
+                className="w-full text-left p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-start gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-[var(--border-subtle)]"
               >
-                <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0 mt-1" />
                 <div>
-                  <div className="font-semibold text-white">GitHub: PR #42 Merged</div>
-                  <div className="text-[10px] text-slate-400">Move tarefa para Concluído &amp; status Pronto</div>
+                  <div className="font-semibold text-[var(--text-primary)]">GitHub: PR Merged</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">Move tarefa para Concluído &amp; status Pronto</div>
                 </div>
               </button>
               <button
+                type="button"
                 onClick={() => {
                   simulateGitHubEvent('PR_OPENED');
                   setShowSimulateDropdown(false);
                 }}
-                className="w-full text-left px-2.5 py-2 rounded hover:bg-[#242b3a] text-slate-200 text-xs flex items-center space-x-2 transition-colors cursor-pointer"
+                className="w-full text-left p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-start gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-[var(--border-subtle)]"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
                 <div>
-                  <div className="font-semibold text-white">GitHub: Novo PR Aberto</div>
-                  <div className="text-[10px] text-slate-400">Move para "Em Revisão" &amp; aciona Codex</div>
+                  <div className="font-semibold text-[var(--text-primary)]">GitHub: Novo PR Aberto</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">Move para "Em Revisão" &amp; aciona Codex</div>
                 </div>
               </button>
             </div>

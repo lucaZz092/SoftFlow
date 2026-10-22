@@ -56,6 +56,12 @@ interface ProjectContextType {
   githubToken: string;
   isGithubConnected: boolean;
   githubUser: string;
+
+  // Theme & Responsiveness
+  theme: 'dark' | 'light';
+  toggleTheme: () => void;
+  isMobileSidebarOpen: boolean;
+  setIsMobileSidebarOpen: (open: boolean) => void;
   
   // Actions
   setCurrentView: (view: ViewType) => void;
@@ -170,7 +176,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isGithubConnected, setIsGithubConnected] = useState<boolean>(true);
   const [githubUser, setGithubUser] = useState<string>('lucas-martins (Prevent Senior)');
 
-  const [currentView, setCurrentView] = useState<ViewType>('table');
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    const saved = localStorage.getItem('softflow_current_view') as ViewType | null;
+    return saved || 'overview';
+  });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('softflow_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
@@ -181,6 +195,25 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [isNewAutomationOpen, setIsNewAutomationOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('softflow_theme', theme);
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  useEffect(() => {
+    localStorage.setItem('softflow_current_view', currentView);
+  }, [currentView]);
 
   useEffect(() => {
     localStorage.setItem('softflow_tasks', JSON.stringify(tasks));
@@ -899,6 +932,10 @@ describe('${task.title}', () => {
   return (
     <ProjectContext.Provider
       value={{
+        theme,
+        toggleTheme,
+        isMobileSidebarOpen,
+        setIsMobileSidebarOpen,
         tasks,
         groups,
         automations,
