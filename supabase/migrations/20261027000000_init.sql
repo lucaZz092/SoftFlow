@@ -2,7 +2,7 @@
 -- Each collection stores the app's object as JSONB (`data`), mirroring the front-end types in src/types.
 -- Access is limited to the e-mails listed in public.allowed_emails (defined below).
 
-create table public.group
+create table public.groups (
   id text primary key,
   data jsonb not null,
   created_at timestamptz not null default now()
@@ -27,30 +27,6 @@ create table public.run_logs (
 );
 
 create table public.custom_columns (
-  id text primary key,
-  data jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-create table public.tags (
-  id text primary key,
-  data jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-create table public.clients (
-  id text primary key,
-  data jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-create table public.billing_projects (
-  id text primary key,
-  data jsonb not null,
-  created_at timestamptz not null default now()
-);
-
-create table public.invoices (
   id text primary key,
   data jsonb not null,
   created_at timestamptz not null default now()
@@ -115,10 +91,6 @@ alter table public.tasks enable row level security;
 alter table public.automations enable row level security;
 alter table public.run_logs enable row level security;
 alter table public.custom_columns enable row level security;
-alter table public.tags enable row level security;
-alter table public.clients enable row level security;
-alter table public.billing_projects enable row level security;
-alter table public.invoices enable row level security;
 alter table public.profiles enable row level security;
 
 create policy "members manage groups" on public.groups for all to authenticated using (public.is_member()) with check (public.is_member());
@@ -126,10 +98,6 @@ create policy "members manage tasks" on public.tasks for all to authenticated us
 create policy "members manage automations" on public.automations for all to authenticated using (public.is_member()) with check (public.is_member());
 create policy "members manage run logs" on public.run_logs for all to authenticated using (public.is_member()) with check (public.is_member());
 create policy "members manage custom columns" on public.custom_columns for all to authenticated using (public.is_member()) with check (public.is_member());
-create policy "members manage tags" on public.tags for all to authenticated using (public.is_member()) with check (public.is_member());
-create policy "members manage clients" on public.clients for all to authenticated using (public.is_member()) with check (public.is_member());
-create policy "members manage billing projects" on public.billing_projects for all to authenticated using (public.is_member()) with check (public.is_member());
-create policy "members manage invoices" on public.invoices for all to authenticated using (public.is_member()) with check (public.is_member());
 create policy "members read profiles" on public.profiles for select to authenticated using (public.is_member());
 create policy "users update own profile" on public.profiles for update to authenticated using (auth.uid() = id and public.is_member());
 
@@ -139,10 +107,6 @@ alter table public.tasks replica identity full;
 alter table public.automations replica identity full;
 alter table public.run_logs replica identity full;
 alter table public.custom_columns replica identity full;
-alter table public.tags replica identity full;
-alter table public.clients replica identity full;
-alter table public.billing_projects replica identity full;
-alter table public.invoices replica identity full;
 
 alter publication supabase_realtime add table
   public.groups,
@@ -150,19 +114,4 @@ alter publication supabase_realtime add table
   public.automations,
   public.run_logs,
   public.custom_columns,
-  public.tags,
-  public.clients,
-  public.billing_projects,
-  public.invoices,
   public.profiles;
-
--- Task attachments: private bucket, files under <task id>/<file>, members only
-insert into storage.buckets (id, name, public, file_size_limit)
-values ('attachments', 'attachments', false, 52428800);
-
-create policy "members read attachments" on storage.objects for select to authenticated
-  using (bucket_id = 'attachments' and public.is_member());
-create policy "members upload attachments" on storage.objects for insert to authenticated
-  with check (bucket_id = 'attachments' and public.is_member());
-create policy "members delete attachments" on storage.objects for delete to authenticated
-  using (bucket_id = 'attachments' and public.is_member());
