@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Check, Plus, ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, ArrowRight } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { PRIORITY_STYLES } from '../styles/designSystem';
 import { Button } from './ui/Button';
+import { Checkbox } from './ui/Checkbox';
 import { TaskStatus } from '../types';
 
 const localDate = (offsetDays = 0) => {
@@ -23,6 +24,21 @@ export const OverviewView: React.FC = () => {
     setFilterStatus,
     currentUser,
   } = useProject();
+
+  // Tasks just ticked: shown checked briefly so the check animation plays before they leave the list
+  const [completing, setCompleting] = useState<Set<string>>(new Set());
+  const completeTask = (taskId: string) => {
+    if (completing.has(taskId)) return;
+    setCompleting((prev) => new Set(prev).add(taskId));
+    window.setTimeout(() => {
+      changeTaskStatus(taskId, 'Pronto');
+      setCompleting((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }, 450);
+  };
 
   const TODAY = localDate(0);
   const TOMORROW = localDate(1);
@@ -160,19 +176,18 @@ export const OverviewView: React.FC = () => {
                 const priorityDot = (PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['Média']).dot;
                 return (
                   <li key={task.id} className="flex items-center gap-3 py-2.5 group">
-                    <button
-                      type="button"
-                      onClick={() => changeTaskStatus(task.id, 'Pronto')}
-                      className="w-4 h-4 rounded-full border border-[var(--border-strong)] hover:border-[var(--accent-primary)] flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                    <Checkbox
+                      checked={completing.has(task.id)}
+                      onChange={() => completeTask(task.id)}
                       title="Marcar como concluída"
                       aria-label={`Concluir ${task.title}`}
-                    >
-                      <Check className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40" />
-                    </button>
+                    />
                     <button
                       type="button"
                       onClick={() => setSelectedTaskId(task.id)}
-                      className="flex-1 min-w-0 text-left text-[13px] text-[var(--text-primary)] truncate cursor-pointer hover:underline underline-offset-2"
+                      className={`flex-1 min-w-0 text-left text-[13px] truncate cursor-pointer hover:underline underline-offset-2 transition-colors ${
+                        completing.has(task.id) ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'
+                      }`}
                     >
                       {task.title}
                     </button>
