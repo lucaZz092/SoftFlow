@@ -80,7 +80,7 @@ export const KanbanView: React.FC = () => {
               onDrop={(e) => handleDrop(e, colStatus)}
               className={`w-72 sm:w-80 flex flex-col max-h-full rounded-xl bg-[var(--bg-surface)] border transition-all shadow-xs ${
                 isOver
-                  ? 'border-[#0066ff] ring-2 ring-[#0066ff]/20 bg-[var(--bg-surface-hover)]'
+                  ? 'border-[var(--accent-primary)] ring-2 ring-[var(--accent-primary)]/20 bg-[var(--bg-surface-hover)]'
                   : 'border-[var(--border-subtle)]'
               }`}
             >
@@ -125,7 +125,7 @@ export const KanbanView: React.FC = () => {
                       onDragEnd={() => setDraggedTaskId(null)}
                       onClick={() => setSelectedTaskId(task.id)}
                       className={`p-3.5 rounded-lg bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-all cursor-grab active:cursor-grabbing shadow-xs space-y-2.5 group ${
-                        isBeingDragged ? 'opacity-40 scale-95 border-dashed border-[#0066ff]' : 'opacity-100'
+                        isBeingDragged ? 'opacity-40 scale-95 border-dashed border-[var(--accent-primary)]' : 'opacity-100'
                       }`}
                     >
                       {/* Group and Priority */}
@@ -142,7 +142,7 @@ export const KanbanView: React.FC = () => {
                       </div>
 
                       {/* Title */}
-                      <div className="font-semibold text-xs text-[var(--text-primary)] leading-snug group-hover:text-[#0066ff] transition-colors">
+                      <div className="font-semibold text-xs text-[var(--text-primary)] leading-snug group-hover:text-[var(--accent-primary)] transition-colors">
                         {task.title}
                       </div>
 
@@ -163,7 +163,7 @@ export const KanbanView: React.FC = () => {
                         )}
 
                         {task.integrations.claude && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-[#0066ff] border border-blue-500/20 flex items-center gap-1">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-[var(--accent-primary)] border border-blue-500/20 flex items-center gap-1">
                             <Bot className="w-3 h-3" />
                             <span>Claude</span>
                           </span>
@@ -218,7 +218,7 @@ export const KanbanView: React.FC = () => {
                   <div
                     className={`p-6 text-center text-xs text-[var(--text-muted)] border border-dashed rounded-xl transition-colors ${
                       isOver
-                        ? 'border-[#0066ff] bg-[#0066ff]/5 text-[#0066ff]'
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 text-[var(--accent-primary)]'
                         : 'border-[var(--border-subtle)]'
                     }`}
                   >

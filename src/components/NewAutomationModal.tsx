@@ -107,7 +107,7 @@ export const NewAutomationModal: React.FC = () => {
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#0066ff]/10 border border-[#0066ff]/20 flex items-center justify-center text-[#0066ff] shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center text-[var(--accent-primary)] shrink-0">
               <Workflow className="w-4 h-4" />
             </div>
             <div>
@@ -139,19 +139,19 @@ export const NewAutomationModal: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="ex: Quando PR for merged -> Mover para Pronto"
-              className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[#0066ff]"
+              className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[var(--accent-primary)]"
             />
           </div>
 
           {/* Trigger Section */}
           <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-2.5">
-            <span className="text-[10px] font-bold text-[#0066ff] uppercase tracking-wider block">
+            <span className="text-[10px] font-bold text-[var(--accent-primary)] uppercase tracking-wider block">
               1. Gatilho (QUANDO ISTO ACONTECER):
             </span>
             <select
               value={triggerType}
               onChange={(e) => setTriggerType(e.target.value as AutomationTriggerType)}
-              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
             >
               <option value="STATUS_CHANGE">O status de uma demanda for alterado</option>
               <option value="GITHUB_PR_MERGED">Um Pull Request for mesclado no GitHub</option>
@@ -166,7 +166,7 @@ export const NewAutomationModal: React.FC = () => {
                 <select
                   value={targetStatus}
                   onChange={(e) => setTargetStatus(e.target.value as TaskStatus)}
-                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   {['A Fazer', 'Trabalhando nisso', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'].map((s) => (
                     <option key={s} value={s}>
@@ -186,7 +186,7 @@ export const NewAutomationModal: React.FC = () => {
             <select
               value={actionType}
               onChange={(e) => setActionType(e.target.value as AutomationActionType)}
-              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+              className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
             >
               <option value="CODEX_GENERATE_TESTS">Acionar Codex para gerar testes unitários (Vitest)</option>
               <option value="CLAUDE_REFINE">Acionar Claude para refinar histórias e critérios</option>
@@ -202,7 +202,7 @@ export const NewAutomationModal: React.FC = () => {
                 <select
                   value={actionStatus}
                   onChange={(e) => setActionStatus(e.target.value as TaskStatus)}
-                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   {['A Fazer', 'Trabalhando nisso', 'Em andamento', 'Em Revisão', 'Parado', 'Pronto'].map((s) => (
                     <option key={s} value={s}>
@@ -219,7 +219,7 @@ export const NewAutomationModal: React.FC = () => {
                 <select
                   value={actionGroup}
                   onChange={(e) => setActionGroup(e.target.value)}
-                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                  className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>

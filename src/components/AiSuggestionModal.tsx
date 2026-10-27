@@ -46,8 +46,8 @@ export const AiSuggestionModal: React.FC = () => {
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#0066ff]/10 border border-[#0066ff]/20 flex items-center justify-center text-[#0066ff] shrink-0">
-              <Sparkles className="w-4 h-4 text-[#0066ff]" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center text-[var(--accent-primary)] shrink-0">
+              <Sparkles className="w-4 h-4 text-[var(--accent-primary)]" />
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
@@ -95,7 +95,7 @@ export const AiSuggestionModal: React.FC = () => {
 
           {/* Suggestion 2: Automation Recommendation */}
           <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-2.5">
-            <div className="flex items-center gap-2 text-[#0066ff] font-semibold">
+            <div className="flex items-center gap-2 text-[var(--accent-primary)] font-semibold">
               <Lightbulb className="w-4 h-4" />
               <span>Automação Ativa: Testes Unitários Automáticos</span>
             </div>

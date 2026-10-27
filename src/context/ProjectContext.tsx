@@ -162,7 +162,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('softflow_hidden_columns');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : ['timeline', 'integrations'];
   });
 
   const [sortBy, setSortBy] = useState<{ field: SortField; direction: 'asc' | 'desc' } | null>(null);

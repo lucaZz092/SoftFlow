@@ -26,7 +26,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066ff] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-canvas)]';
+      'inline-flex items-center justify-center font-medium transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-canvas)]';
 
     const sizeStyles = {
       xs: 'text-xs px-2 py-1 gap-1.5 rounded-md min-h-[26px]',
@@ -38,9 +38,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary:
-        'bg-[#0066ff] hover:bg-[#0052cc] active:bg-[#0047b3] text-white shadow-sm font-semibold border border-transparent shadow-[#0066ff]/20',
+        'bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] active:bg-[var(--accent-hover)] text-white border border-transparent',
       secondary:
-        'bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] active:bg-[var(--bg-surface-active)] text-[var(--text-primary)] border border-[var(--border-subtle)] shadow-xs',
+        'bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] active:bg-[var(--bg-surface-active)] text-[var(--text-primary)] border border-[var(--border-subtle)]',
       ghost:
         'bg-transparent hover:bg-[var(--bg-surface-hover)] active:bg-[var(--bg-surface-active)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent',
       danger:

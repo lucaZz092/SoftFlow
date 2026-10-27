@@ -17,7 +17,7 @@ export const Toasts: React.FC = () => {
       case 'automation':
         return <Workflow className="w-4 h-4 text-emerald-500" />;
       default:
-        return <Info className="w-4 h-4 text-[#0066ff]" />;
+        return <Info className="w-4 h-4 text-[var(--accent-primary)]" />;
     }
   };
 

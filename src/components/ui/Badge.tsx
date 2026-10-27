@@ -56,7 +56,7 @@ export const Badge: React.FC<BadgeProps> = ({
   const variantStyles: Record<BadgeVariant, string> = {
     default: 'bg-[var(--bg-canvas)] text-[var(--text-secondary)] border-[var(--border-subtle)]',
     neutral: 'bg-[var(--bg-surface-hover)] text-[var(--text-primary)] border-[var(--border-subtle)]',
-    blue: 'bg-[#0066ff]/10 text-[#0066ff] border-[#0066ff]/30 dark:text-[#3385ff]',
+    blue: 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border-[var(--accent-primary)]/30 dark:text-[var(--accent-primary)]',
     purple: 'bg-purple-500/10 text-purple-600 border-purple-500/30 dark:text-purple-400',
     green: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400',
   };

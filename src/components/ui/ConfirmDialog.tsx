@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 className={`w-10 h-10 rounded-lg shrink-0 flex items-center justify-center ${
                   variant === 'danger'
                     ? 'bg-red-500/10 text-red-500 border border-red-500/20'
-                    : 'bg-[#0066ff]/10 text-[#0066ff] border border-[#0066ff]/20'
+                    : 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20'
                 }`}
               >
                 <AlertTriangle className="w-5 h-5" />

@@ -131,7 +131,7 @@ export const TableView: React.FC = () => {
     displayGroups = statuses.map((st) => ({
       id: `group-status-${st}`,
       title: st,
-      color: STATUS_STYLES[st]?.dot ? '#0066ff' : '#64748b',
+      color: STATUS_STYLES[st]?.dot ? 'var(--accent-primary)' : '#64748b',
       collapsed: false,
       tasks: filteredTasks.filter((t) => t.status === st),
     }));
@@ -172,7 +172,7 @@ export const TableView: React.FC = () => {
 
   const handleCreateGroup = () => {
     if (!newGroupTitle.trim()) return;
-    addGroup(newGroupTitle.trim(), '#0066ff');
+    addGroup(newGroupTitle.trim(), 'var(--accent-primary)');
     setNewGroupTitle('');
     setIsAddingGroup(false);
   };
@@ -208,7 +208,7 @@ export const TableView: React.FC = () => {
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-strong)] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-3.5 backdrop-blur-md"
           >
             <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-md bg-[#0066ff] text-white text-[11px] font-bold flex items-center justify-center font-mono">
+              <span className="w-5 h-5 rounded-md bg-[var(--accent-primary)] text-white text-[11px] font-bold flex items-center justify-center font-mono">
                 {selectedTaskIds.length}
               </span>
               <span className="text-xs font-semibold">Demandas selecionadas</span>
@@ -257,11 +257,6 @@ export const TableView: React.FC = () => {
         const totalCount = groupTasks.length;
         const groupTaskIds = groupTasks.map((t) => t.id);
         const allGroupSelected = groupTaskIds.length > 0 && groupTaskIds.every((id) => selectedTaskIds.includes(id));
-
-        const statusCounts: Record<string, number> = {};
-        groupTasks.forEach((t) => {
-          statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
-        });
 
         return (
           <div
@@ -317,7 +312,7 @@ export const TableView: React.FC = () => {
                           type="checkbox"
                           checked={allGroupSelected}
                           onChange={() => selectAllTasksInGroup(group.id)}
-                          className="rounded border-[var(--border-subtle)] text-[#0066ff] cursor-pointer focus:ring-1 focus:ring-[#0066ff]"
+                          className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer focus:ring-1 focus:ring-[var(--accent-primary)]"
                           aria-label="Selecionar todas as tarefas deste grupo"
                         />
                       </th>
@@ -396,7 +391,7 @@ export const TableView: React.FC = () => {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleTaskSelection(task.id)}
-                              className="rounded border-[var(--border-subtle)] text-[#0066ff] cursor-pointer"
+                              className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer"
                               aria-label={`Selecionar ${task.title}`}
                             />
                           </td>
@@ -421,12 +416,12 @@ export const TableView: React.FC = () => {
                                       setEditingTaskId(null);
                                     }
                                   }}
-                                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-2 py-1 rounded-md border border-[#0066ff] outline-none text-xs"
+                                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-2 py-1 rounded-md border border-[var(--accent-primary)] outline-none text-xs"
                                 />
                               ) : (
                                 <span
                                   onClick={() => setEditingTaskId(task.id)}
-                                  className="font-medium text-[var(--text-primary)] hover:text-[#0066ff] cursor-pointer truncate max-w-[340px] transition-colors"
+                                  className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] cursor-pointer truncate max-w-[340px] transition-colors"
                                   title="Clique para editar o título"
                                 >
                                   {task.title}
@@ -451,13 +446,13 @@ export const TableView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedTaskId(task.id)}
-                              className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#0066ff] transition-colors relative cursor-pointer"
+                              className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors relative cursor-pointer"
                               title="Ver atualizações, logs de IA e comentários"
                               aria-label="Abrir detalhes da tarefa"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               {task.comments.length > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-[#0066ff] text-white text-[8px] font-bold rounded-full flex items-center justify-center font-mono">
+                                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-[var(--accent-primary)] text-white text-[8px] font-bold rounded-full flex items-center justify-center font-mono">
                                   {task.comments.length}
                                 </span>
                               )}
@@ -482,7 +477,7 @@ export const TableView: React.FC = () => {
                                     {task.assignee.initials}
                                   </div>
                                 ) : (
-                                  <div className="w-6 h-6 rounded-full border border-dashed border-[var(--border-strong)] text-[var(--text-muted)] text-xs flex items-center justify-center hover:border-[#0066ff] transition-colors">
+                                  <div className="w-6 h-6 rounded-full border border-dashed border-[var(--border-strong)] text-[var(--text-muted)] text-xs flex items-center justify-center hover:border-[var(--accent-primary)] transition-colors">
                                     +
                                   </div>
                                 )}
@@ -658,7 +653,7 @@ export const TableView: React.FC = () => {
                             <td className="px-3 py-2.5 text-center">
                               <div className="w-28 mx-auto h-5 bg-[var(--bg-canvas)] rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium relative border border-[var(--border-subtle)]">
                                 <div
-                                  className="absolute left-0 top-0 bottom-0 bg-[#0066ff] opacity-40"
+                                  className="absolute left-0 top-0 bottom-0 bg-[var(--accent-primary)] opacity-40"
                                   style={{ width: task.status === 'Pronto' ? '100%' : '60%' }}
                                 />
                                 <span className="relative z-10 font-mono tabular-nums tracking-tight text-[10px] px-1 truncate text-[var(--text-primary)]">
@@ -692,7 +687,7 @@ export const TableView: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => setSelectedTaskId(task.id)}
-                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-[#0066ff] border border-blue-500/20 flex items-center gap-1 cursor-pointer font-medium"
+                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-[var(--accent-primary)] border border-blue-500/20 flex items-center gap-1 cursor-pointer font-medium"
                                     title="Critérios de aceite gerados pelo Claude"
                                   >
                                     <Bot className="w-3 h-3" />
@@ -702,7 +697,7 @@ export const TableView: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => simulateClaudeRefine(task.id)}
-                                    className="text-[var(--text-muted)] hover:text-[#0066ff] transition-colors p-1 cursor-pointer"
+                                    className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors p-1 cursor-pointer"
                                     title="Refinar histórias com Claude"
                                   >
                                     <Bot className="w-3.5 h-3.5" />
@@ -743,7 +738,7 @@ export const TableView: React.FC = () => {
                                   defaultValue={val}
                                   placeholder="-"
                                   onBlur={(e) => updateCustomFieldValue(task.id, col.id, e.target.value)}
-                                  className="w-full bg-transparent hover:bg-[var(--bg-canvas)] focus:bg-[var(--bg-canvas)] text-center text-[var(--text-primary)] outline-none text-xs rounded-md px-1.5 py-0.5 border border-transparent focus:border-[#0066ff] font-mono tabular-nums transition-colors"
+                                  className="w-full bg-transparent hover:bg-[var(--bg-canvas)] focus:bg-[var(--bg-canvas)] text-center text-[var(--text-primary)] outline-none text-xs rounded-md px-1.5 py-0.5 border border-transparent focus:border-[var(--accent-primary)] font-mono tabular-nums transition-colors"
                                 />
                               </td>
                             );
@@ -797,66 +792,6 @@ export const TableView: React.FC = () => {
                     </tr>
                   </tbody>
 
-                  {/* Group Summary Row */}
-                  {totalCount > 0 && (
-                    <tfoot>
-                      <tr className="border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[11px] text-[var(--text-muted)]">
-                        <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2 font-medium">Resumo ({totalCount})</td>
-                        <td className="px-2 py-2"></td>
-
-                        {!hiddenColumns.includes('assignee') && (
-                          <td className="px-3 py-2 text-center font-mono tabular-nums">{totalCount} membros</td>
-                        )}
-
-                        {!hiddenColumns.includes('status') && (
-                          <td className="px-3 py-2 text-center">
-                            <div className="w-28 mx-auto h-2.5 rounded-full overflow-hidden flex bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)]">
-                              {Object.entries(statusCounts).map(([st, cnt]) => {
-                                const pct = Math.round((cnt / totalCount) * 100);
-                                const isDone = st === 'Pronto';
-                                const color = isDone ? '#10b981' : st === 'Parado' ? '#ef4444' : '#0066ff';
-                                return (
-                                  <div
-                                    key={st}
-                                    style={{ width: `${pct}%`, backgroundColor: color }}
-                                    title={`${st}: ${cnt} (${pct}%)`}
-                                    className="h-full"
-                                  />
-                                );
-                              })}
-                            </div>
-                          </td>
-                        )}
-
-                        {!hiddenColumns.includes('dueDate') && (
-                          <td className="px-3 py-2 text-center font-mono tabular-nums">{totalCount} prazos</td>
-                        )}
-
-                        {!hiddenColumns.includes('priority') && (
-                          <td className="px-3 py-2 text-center font-mono text-[10px]">prioridades</td>
-                        )}
-
-                        {!hiddenColumns.includes('timeline') && (
-                          <td className="px-3 py-2 text-center font-mono text-[10px]">ativo</td>
-                        )}
-
-                        {!hiddenColumns.includes('integrations') && (
-                          <td className="px-3 py-2 text-center text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">
-                            conectado
-                          </td>
-                        )}
-
-                        {customColumns.map((c) => (
-                          <td key={c.id} className="px-3 py-2 text-center text-[var(--text-muted)] font-mono text-[10px]">
-                            -
-                          </td>
-                        ))}
-
-                        <td className="px-2 py-2"></td>
-                      </tr>
-                    </tfoot>
-                  )}
                 </table>
               </div>
             )}
@@ -888,7 +823,7 @@ export const TableView: React.FC = () => {
                 if (e.key === 'Escape') setIsAddingGroup(false);
               }}
               placeholder="Nome do grupo (ex: Engenharia Backend)..."
-              className="bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs flex-1 focus:border-[#0066ff]"
+              className="bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs flex-1 focus:border-[var(--accent-primary)]"
             />
             <Button variant="primary" size="sm" onClick={handleCreateGroup}>
               Criar grupo
@@ -902,7 +837,7 @@ export const TableView: React.FC = () => {
             variant="secondary"
             size="sm"
             onClick={() => setIsAddingGroup(true)}
-            leftIcon={<Plus className="w-3.5 h-3.5 text-[#0066ff]" />}
+            leftIcon={<Plus className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
           >
             Adicionar novo grupo de demandas
           </Button>
@@ -933,7 +868,7 @@ export const TableView: React.FC = () => {
                   value={newColTitle}
                   onChange={(e) => setNewColTitle(e.target.value)}
                   placeholder="ex: Estimativa (Horas), PR Link, Tags..."
-                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[#0066ff]"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs focus:border-[var(--accent-primary)]"
                 />
               </div>
 
@@ -942,7 +877,7 @@ export const TableView: React.FC = () => {
                 <select
                   value={newColType}
                   onChange={(e) => setNewColType(e.target.value as CustomColumn['type'])}
-                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   <option value="text">Texto Livre</option>
                   <option value="number">Número / Horas</option>

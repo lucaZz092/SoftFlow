@@ -187,7 +187,7 @@ export const IntegrationsModal: React.FC = () => {
                       value={tempToken}
                       onChange={(e) => setTempToken(e.target.value)}
                       placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="flex-1 bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[#0066ff]"
+                      className="flex-1 bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[var(--accent-primary)]"
                     />
                     <Button
                       variant="primary"
@@ -211,7 +211,7 @@ export const IntegrationsModal: React.FC = () => {
                     type="text"
                     value={githubRepo}
                     onChange={(e) => setGithubRepo(e.target.value)}
-                    className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[#0066ff]"
+                    className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] outline-none font-mono text-xs focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
@@ -266,7 +266,7 @@ export const IntegrationsModal: React.FC = () => {
                 <select
                   value={claudeModel}
                   onChange={(e) => setClaudeModel(e.target.value)}
-                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Padrão para Engenharia)</option>
                   <option value="claude-3-haiku">Claude 3.5 Haiku (Respostas Rápidas)</option>
@@ -297,7 +297,7 @@ export const IntegrationsModal: React.FC = () => {
                 <select
                   value={codexFramework}
                   onChange={(e) => setCodexFramework(e.target.value)}
-                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                  className="w-full bg-[var(--bg-canvas)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
                 >
                   <option value="vitest">Vitest / Testing Library</option>
                   <option value="jest">Jest</option>

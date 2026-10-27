@@ -147,7 +147,7 @@ export const TaskDetailDrawer: React.FC = () => {
                 type="text"
                 value={task.title}
                 onChange={(e) => updateTask(task.id, { title: e.target.value })}
-                className="w-full text-base sm:text-lg font-bold text-[var(--text-primary)] bg-transparent border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[#0066ff] outline-none pb-0.5 transition-colors"
+                className="w-full text-base sm:text-lg font-bold text-[var(--text-primary)] bg-transparent border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--accent-primary)] outline-none pb-0.5 transition-colors"
                 title="Editar título da demanda"
               />
             </div>
@@ -170,7 +170,7 @@ export const TaskDetailDrawer: React.FC = () => {
               <select
                 value={task.status}
                 onChange={(e) => changeTaskStatus(task.id, e.target.value as TaskStatus)}
-                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
+                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[var(--accent-primary)]"
               >
                 {Object.keys(STATUS_STYLES).map((s) => (
                   <option key={s} value={s}>
@@ -186,7 +186,7 @@ export const TaskDetailDrawer: React.FC = () => {
               <select
                 value={task.priority}
                 onChange={(e) => changeTaskPriority(task.id, e.target.value as TaskPriority)}
-                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[#0066ff]"
+                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs font-semibold cursor-pointer focus:border-[var(--accent-primary)]"
               >
                 {['Crítica', 'Alta', 'Média', 'Baixa'].map((p) => (
                   <option key={p} value={p}>
@@ -205,7 +205,7 @@ export const TaskDetailDrawer: React.FC = () => {
                   const member = TEAM_MEMBERS.find((m) => m.id === e.target.value) || null;
                   updateTask(task.id, { assignee: member });
                 }}
-                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[#0066ff]"
+                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
               >
                 <option value="">Sem responsável</option>
                 {TEAM_MEMBERS.map((m) => (
@@ -223,7 +223,7 @@ export const TaskDetailDrawer: React.FC = () => {
                 type="date"
                 value={task.dueDate}
                 onChange={(e) => updateTask(task.id, { dueDate: e.target.value })}
-                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] text-xs outline-none focus:border-[#0066ff]"
+                className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] text-xs outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
           </div>
@@ -235,7 +235,7 @@ export const TaskDetailDrawer: React.FC = () => {
               onClick={() => setActiveTab('comments')}
               className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
                 activeTab === 'comments'
-                  ? 'border-[#0066ff] text-[#0066ff] font-semibold'
+                  ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] font-semibold'
                   : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -248,7 +248,7 @@ export const TaskDetailDrawer: React.FC = () => {
               onClick={() => setActiveTab('subtasks')}
               className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
                 activeTab === 'subtasks'
-                  ? 'border-[#0066ff] text-[#0066ff] font-semibold'
+                  ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] font-semibold'
                   : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
@@ -345,7 +345,7 @@ export const TaskDetailDrawer: React.FC = () => {
                           ) : comm.avatar ? (
                             <img src={comm.avatar} alt={comm.author} className="w-5 h-5 rounded-full" />
                           ) : (
-                            <div className="w-5 h-5 rounded-full bg-[#0066ff] text-white font-bold text-[10px] flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white font-bold text-[10px] flex items-center justify-center">
                               LM
                             </div>
                           )}
@@ -422,7 +422,7 @@ export const TaskDetailDrawer: React.FC = () => {
                         type="checkbox"
                         checked={st.completed}
                         onChange={() => {}}
-                        className="rounded border-[var(--border-subtle)] text-[#0066ff] cursor-pointer"
+                        className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer"
                       />
                       <span
                         className={`text-xs ${
@@ -507,7 +507,7 @@ export const TaskDetailDrawer: React.FC = () => {
                         value={newBranchInput}
                         onChange={(e) => setNewBranchInput(e.target.value)}
                         placeholder={`feature/${task.id.slice(-4)}-sua-branch`}
-                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-mono outline-none focus:border-[#0066ff]"
+                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-mono outline-none focus:border-[var(--accent-primary)]"
                       />
                       <Button variant="secondary" size="sm" onClick={handleCreateBranchAction}>
                         Criar Branch
@@ -524,7 +524,7 @@ export const TaskDetailDrawer: React.FC = () => {
                         value={newPrTitleInput}
                         onChange={(e) => setNewPrTitleInput(e.target.value)}
                         placeholder={`feat: ${task.title}`}
-                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs outline-none focus:border-[#0066ff]"
+                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs outline-none focus:border-[var(--accent-primary)]"
                       />
                       <Button
                         variant="primary"

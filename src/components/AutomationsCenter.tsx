@@ -41,7 +41,7 @@ export const AutomationsCenter: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-2">
-            <Workflow className="w-5 h-5 text-[#0066ff]" />
+            <Workflow className="w-5 h-5 text-[var(--accent-primary)]" />
             <h1 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
               Central de Automações &amp; Fluxos
             </h1>
@@ -169,7 +169,7 @@ export const AutomationsCenter: React.FC = () => {
                         </span>
                       )}
                       {wf.action.integrationIcon === 'claude' && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-[#0066ff] border border-blue-500/20 flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-[var(--accent-primary)] border border-blue-500/20 flex items-center gap-1">
                           <Bot className="w-3 h-3" />
                           <span>Claude</span>
                         </span>
@@ -214,7 +214,7 @@ export const AutomationsCenter: React.FC = () => {
                 <div className="py-3.5 flex flex-wrap items-center gap-2 text-xs">
                   {/* Step 1: Trigger */}
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
-                    <span className="text-[10px] font-bold text-[#0066ff] uppercase">QUANDO</span>
+                    <span className="text-[10px] font-bold text-[var(--accent-primary)] uppercase">QUANDO</span>
                     <span className="font-medium">{wf.trigger.label}</span>
                   </div>
 
@@ -302,7 +302,7 @@ export const AutomationsCenter: React.FC = () => {
                         log.integrationType === 'Codex'
                           ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                           : log.integrationType === 'Claude'
-                          ? 'bg-blue-500/10 text-[#0066ff] border-blue-500/20'
+                          ? 'bg-blue-500/10 text-[var(--accent-primary)] border-blue-500/20'
                           : log.integrationType === 'GitHub'
                           ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
                           : 'bg-blue-500/10 text-blue-600 border-blue-500/20'

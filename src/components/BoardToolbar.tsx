@@ -8,7 +8,6 @@ import {
   ArrowUpDown,
   EyeOff,
   Layers,
-  GitPullRequest,
   CheckCircle2,
   X,
   Check,
@@ -29,7 +28,6 @@ export const BoardToolbar: React.FC = () => {
     setFilterPriority,
     filterAssigneeId,
     setFilterAssigneeId,
-    simulateGitHubEvent,
     sortBy,
     setSortBy,
     hiddenColumns,
@@ -43,7 +41,6 @@ export const BoardToolbar: React.FC = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showHideDropdown, setShowHideDropdown] = useState(false);
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
-  const [showSimulateDropdown, setShowSimulateDropdown] = useState(false);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +53,6 @@ export const BoardToolbar: React.FC = () => {
         setShowSortDropdown(false);
         setShowHideDropdown(false);
         setShowGroupDropdown(false);
-        setShowSimulateDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -90,31 +86,19 @@ export const BoardToolbar: React.FC = () => {
   return (
     <div
       ref={toolbarRef}
-      className="min-h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 sm:px-5 flex flex-wrap items-center justify-between gap-2 text-xs select-none transition-colors py-1.5"
+      className="min-h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] px-4 sm:px-6 flex flex-wrap items-center gap-2 text-xs select-none transition-colors py-2"
     >
       {/* Left controls */}
       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
         {/* Criar demanda */}
-        <div className="flex items-center rounded-lg overflow-hidden shadow-xs border border-transparent">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleCreateTask}
-            leftIcon={<Plus className="w-3.5 h-3.5" />}
-            className="rounded-r-none font-semibold"
-          >
-            Criar demanda
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleCreateTask}
-            className="rounded-l-none border-l border-white/20 px-2 min-h-[30px]"
-            aria-label="Opções de criação"
-          >
-            <ChevronDown className="w-3 h-3" />
-          </Button>
-        </div>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleCreateTask}
+          leftIcon={<Plus className="w-3.5 h-3.5" />}
+        >
+          Nova demanda
+        </Button>
 
         {/* Search */}
         <div className="relative">
@@ -124,7 +108,7 @@ export const BoardToolbar: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filtrar por nome..."
-            className="bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] focus:bg-[var(--bg-canvas)] text-[var(--text-primary)] placeholder-[var(--text-muted)] pl-8 pr-6 py-1 rounded-lg border border-[var(--border-subtle)] focus:border-[#0066ff] outline-none transition-all w-28 sm:w-36 focus:w-48 text-xs"
+            className="bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] focus:bg-[var(--bg-canvas)] text-[var(--text-primary)] placeholder-[var(--text-muted)] pl-8 pr-6 py-1 rounded-lg border border-[var(--border-subtle)] focus:border-[var(--accent-primary)] outline-none transition-all w-28 sm:w-36 focus:w-48 text-xs"
           />
           {searchQuery && (
             <button
@@ -148,8 +132,7 @@ export const BoardToolbar: React.FC = () => {
               setShowSortDropdown(false);
               setShowHideDropdown(false);
               setShowGroupDropdown(false);
-              setShowSimulateDropdown(false);
-            }}
+                  }}
             leftIcon={<User className="w-3.5 h-3.5" />}
           >
             Pessoa
@@ -166,7 +149,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center justify-between text-left text-xs transition-colors"
               >
                 <span>Todos os membros</span>
-                {!filterAssigneeId && <CheckCircle2 className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {!filterAssigneeId && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
               {TEAM_MEMBERS.map((m) => (
                 <button
@@ -187,7 +170,7 @@ export const BoardToolbar: React.FC = () => {
                     </span>
                     <span className="truncate">{m.name}</span>
                   </div>
-                  {filterAssigneeId === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-[#0066ff] shrink-0" />}
+                  {filterAssigneeId === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />}
                 </button>
               ))}
             </div>
@@ -205,8 +188,7 @@ export const BoardToolbar: React.FC = () => {
               setShowSortDropdown(false);
               setShowHideDropdown(false);
               setShowGroupDropdown(false);
-              setShowSimulateDropdown(false);
-            }}
+                  }}
             leftIcon={<Filter className="w-3.5 h-3.5" />}
             rightIcon={<ChevronDown className="w-3 h-3" />}
           >
@@ -230,7 +212,7 @@ export const BoardToolbar: React.FC = () => {
                       }}
                       className={`px-2 py-1 rounded-md text-[11px] text-left transition-colors truncate cursor-pointer ${
                         filterStatus === s
-                          ? 'bg-[#0066ff] text-white font-medium shadow-xs'
+                          ? 'bg-[var(--accent-primary)] text-white font-medium shadow-xs'
                           : 'hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)]'
                       }`}
                     >
@@ -255,7 +237,7 @@ export const BoardToolbar: React.FC = () => {
                       }}
                       className={`px-2 py-1 rounded-md text-[11px] text-left transition-colors truncate cursor-pointer ${
                         filterPriority === p
-                          ? 'bg-[#0066ff] text-white font-medium shadow-xs'
+                          ? 'bg-[var(--accent-primary)] text-white font-medium shadow-xs'
                           : 'hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)]'
                       }`}
                     >
@@ -279,8 +261,7 @@ export const BoardToolbar: React.FC = () => {
               setShowFilterDropdown(false);
               setShowHideDropdown(false);
               setShowGroupDropdown(false);
-              setShowSimulateDropdown(false);
-            }}
+                  }}
             leftIcon={<ArrowUpDown className="w-3.5 h-3.5" />}
           >
             <span>Ordenar</span>
@@ -301,7 +282,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Prazo de Entrega</span>
-                {sortBy?.field === 'dueDate' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {sortBy?.field === 'dueDate' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
               <button
                 type="button"
@@ -312,7 +293,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Prioridade (Mais Crítica)</span>
-                {sortBy?.field === 'priority' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {sortBy?.field === 'priority' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
               <button
                 type="button"
@@ -323,7 +304,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Título (A - Z)</span>
-                {sortBy?.field === 'title' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {sortBy?.field === 'title' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
 
               {sortBy && (
@@ -353,8 +334,7 @@ export const BoardToolbar: React.FC = () => {
               setShowFilterDropdown(false);
               setShowSortDropdown(false);
               setShowGroupDropdown(false);
-              setShowSimulateDropdown(false);
-            }}
+                  }}
             leftIcon={<EyeOff className="w-3.5 h-3.5" />}
           >
             <span>Ocultar</span>
@@ -397,8 +377,7 @@ export const BoardToolbar: React.FC = () => {
               setShowFilterDropdown(false);
               setShowSortDropdown(false);
               setShowHideDropdown(false);
-              setShowSimulateDropdown(false);
-            }}
+                  }}
             leftIcon={<Layers className="w-3.5 h-3.5" />}
           >
             Agrupar
@@ -418,7 +397,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Grupos de Trabalho (Padrão)</span>
-                {groupBy === 'group' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {groupBy === 'group' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
               <button
                 type="button"
@@ -429,7 +408,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Por Status</span>
-                {groupBy === 'status' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {groupBy === 'status' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
               <button
                 type="button"
@@ -440,7 +419,7 @@ export const BoardToolbar: React.FC = () => {
                 className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span>Por Responsável</span>
-                {groupBy === 'assignee' && <Check className="w-3.5 h-3.5 text-[#0066ff]" />}
+                {groupBy === 'assignee' && <Check className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
             </div>
           )}
@@ -457,64 +436,6 @@ export const BoardToolbar: React.FC = () => {
         )}
       </div>
 
-      {/* Right controls: Webhook Simulator button */}
-      <div className="flex items-center gap-2">
-        <div className="relative">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setShowSimulateDropdown(!showSimulateDropdown);
-              setShowPersonDropdown(false);
-              setShowFilterDropdown(false);
-              setShowSortDropdown(false);
-              setShowHideDropdown(false);
-              setShowGroupDropdown(false);
-            }}
-            leftIcon={<GitPullRequest className="w-3.5 h-3.5 text-emerald-500" />}
-            rightIcon={<ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />}
-            title="Simular eventos em tempo real para disparar automações"
-          >
-            <span>Simular Webhook</span>
-          </Button>
-
-          {showSimulateDropdown && (
-            <div className="absolute right-0 top-full mt-1.5 w-72 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl p-2 z-40 space-y-1.5">
-              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-2 py-1 block">
-                Disparo em Tempo Real:
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  simulateGitHubEvent('PR_MERGED');
-                  setShowSimulateDropdown(false);
-                }}
-                className="w-full text-left p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-start gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-[var(--border-subtle)]"
-              >
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0 mt-1" />
-                <div>
-                  <div className="font-semibold text-[var(--text-primary)]">GitHub: PR Merged</div>
-                  <div className="text-[11px] text-[var(--text-muted)]">Move tarefa para Concluído &amp; status Pronto</div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  simulateGitHubEvent('PR_OPENED');
-                  setShowSimulateDropdown(false);
-                }}
-                className="w-full text-left p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] text-xs flex items-start gap-2.5 transition-colors cursor-pointer border border-transparent hover:border-[var(--border-subtle)]"
-              >
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
-                <div>
-                  <div className="font-semibold text-[var(--text-primary)]">GitHub: Novo PR Aberto</div>
-                  <div className="text-[11px] text-[var(--text-muted)]">Move para "Em Revisão" &amp; aciona Codex</div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

@@ -43,7 +43,7 @@ export const MetricsView: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#0066ff]" />
+            <BarChart3 className="w-5 h-5 text-[var(--accent-primary)]" />
             <span>Métricas de Entrega &amp; Eficiência</span>
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
@@ -89,9 +89,9 @@ export const MetricsView: React.FC = () => {
         <div className="p-4 sm:p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
           <div className="flex items-center justify-between text-[var(--text-muted)] text-xs font-semibold uppercase tracking-wider">
             <span>Disparos de Automação</span>
-            <Workflow className="w-4 h-4 text-[#0066ff]" />
+            <Workflow className="w-4 h-4 text-[var(--accent-primary)]" />
           </div>
-          <div className="text-2xl font-bold text-[#0066ff] mt-2 font-mono tabular-nums">{runLogs.length}</div>
+          <div className="text-2xl font-bold text-[var(--accent-primary)] mt-2 font-mono tabular-nums">{runLogs.length}</div>
           <div className="text-xs text-emerald-500 font-medium mt-3">Execuções sem intervenção manual</div>
         </div>
       </div>
@@ -116,7 +116,7 @@ export const MetricsView: React.FC = () => {
                   </div>
                   <div className="w-full bg-[var(--bg-canvas)] h-2 rounded-full overflow-hidden border border-[var(--border-subtle)]">
                     <div
-                      className="h-full rounded-full transition-all bg-[#0066ff]"
+                      className="h-full rounded-full transition-all bg-[var(--accent-primary)]"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

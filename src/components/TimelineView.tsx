@@ -28,7 +28,7 @@ export const TimelineView: React.FC = () => {
       {/* Timeline Controls */}
       <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
         <div className="flex items-center gap-2.5">
-          <Calendar className="w-4 h-4 text-[#0066ff]" />
+          <Calendar className="w-4 h-4 text-[var(--accent-primary)]" />
           <h2 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
             Cronograma de Sprints e Entregas
           </h2>
@@ -69,7 +69,7 @@ export const TimelineView: React.FC = () => {
               <div
                 key={d.num}
                 className={`col-span-1 p-2.5 text-center border-r border-[var(--border-subtle)] font-mono tabular-nums text-xs ${
-                  d.num === 22 ? 'bg-[#0066ff]/10 text-[#0066ff] font-bold' : ''
+                  d.num === 22 ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] font-bold' : ''
                 }`}
               >
                 <div>{d.label}</div>
@@ -109,7 +109,7 @@ export const TimelineView: React.FC = () => {
                       {/* Left Title */}
                       <div className="col-span-4 p-3 border-r border-[var(--border-subtle)] flex items-center gap-2 truncate">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: group.color }} />
-                        <span className="text-xs font-medium text-[var(--text-primary)] group-hover:text-[#0066ff] truncate transition-colors">
+                        <span className="text-xs font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] truncate transition-colors">
                           {task.title}
                         </span>
                       </div>
@@ -118,13 +118,13 @@ export const TimelineView: React.FC = () => {
                       <div className="col-span-8 relative flex items-center px-1">
                         {/* Today Marker Line (Day 22) */}
                         <div
-                          className="absolute top-0 bottom-0 w-px bg-[#0066ff]/40 pointer-events-none z-10"
+                          className="absolute top-0 bottom-0 w-px bg-[var(--accent-primary)]/40 pointer-events-none z-10"
                           style={{ left: `${((22 - 18) / 10) * 100}%` }}
                         />
 
                         {/* Task Timeline Bar Capsule */}
                         <div
-                          className="h-6 rounded-md shadow-xs flex items-center px-2.5 text-[11px] font-medium text-white truncate transition-opacity hover:opacity-90 bg-[#0066ff]"
+                          className="h-6 rounded-md shadow-xs flex items-center px-2.5 text-[11px] font-medium text-white truncate transition-opacity hover:opacity-90 bg-[var(--accent-primary)]"
                           style={{
                             marginLeft: `${((startDay - 18) / 10) * 100}%`,
                             width: `${Math.max(14, (span / 10) * 100)}%`,
