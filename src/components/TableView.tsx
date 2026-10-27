@@ -22,6 +22,7 @@ import { TaskBadges } from './task/TaskBadges';
 import { TaskStatus, TaskPriority, CustomColumn, Task, Group } from '../types';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
 import { Button } from './ui/Button';
+import { Checkbox } from './ui/Checkbox';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { EmptyState } from './ui/EmptyState';
 
@@ -318,11 +319,9 @@ export const TableView: React.FC = () => {
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-canvas)]">
                       <th className="w-10 px-3 py-2.5 text-center">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={allGroupSelected}
                           onChange={() => selectAllTasksInGroup(group.id)}
-                          className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer focus:ring-1 focus:ring-[var(--accent-primary)]"
                           aria-label="Selecionar todas as tarefas deste grupo"
                         />
                       </th>
@@ -394,11 +393,9 @@ export const TableView: React.FC = () => {
                         >
                           {/* Checkbox */}
                           <td className="px-3 py-2.5 text-center">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={isSelected}
                               onChange={() => toggleTaskSelection(task.id)}
-                              className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer"
                               aria-label={`Selecionar ${task.title}`}
                             />
                           </td>

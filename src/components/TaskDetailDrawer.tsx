@@ -5,6 +5,7 @@ import { useProject } from '../context/ProjectContext';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
 import { TaskStatus, TaskPriority } from '../types';
 import { Button } from './ui/Button';
+import { Checkbox } from './ui/Checkbox';
 import { TaskDetailsTab } from './task/TaskDetailsTab';
 import { TaskTimeTab } from './task/TaskTimeTab';
 import { TaskAttachmentsTab } from './task/TaskAttachmentsTab';
@@ -322,17 +323,11 @@ export const TaskDetailDrawer: React.FC = () => {
 
                 <div className="space-y-2">
                   {task.subtasks.map((st) => (
-                    <div
+                    <label
                       key={st.id}
-                      onClick={() => toggleSubtask(task.id, st.id)}
                       className="flex items-center gap-3 p-2.5 rounded-lg bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] cursor-pointer transition-colors"
                     >
-                      <input
-                        type="checkbox"
-                        checked={st.completed}
-                        onChange={() => {}}
-                        className="rounded border-[var(--border-subtle)] text-[var(--accent-primary)] cursor-pointer"
-                      />
+                      <Checkbox checked={st.completed} onChange={() => toggleSubtask(task.id, st.id)} />
                       <span
                         className={`text-xs ${
                           st.completed ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'
@@ -340,7 +335,7 @@ export const TaskDetailDrawer: React.FC = () => {
                       >
                         {st.title}
                       </span>
-                    </div>
+                    </label>
                   ))}
 
                   {task.subtasks.length === 0 && (

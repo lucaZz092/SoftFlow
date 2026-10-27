@@ -7,6 +7,7 @@ import { addDays, localDate } from '../../lib/dates';
 import { formatDuration } from '../../lib/time';
 import { InvoiceItem, InvoiceStatus } from '../../types';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { fieldClass, FormField, Modal } from '../ui/Modal';
 
 interface ManualItem {
@@ -133,8 +134,7 @@ export const InvoiceEditor: React.FC<{ initialClientId?: string; onClose: () => 
                 return (
                   <li key={taskId}>
                     <label className="flex items-center gap-3 py-2 text-[13px] cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={!excludedTasks.has(taskId)}
                         onChange={() => setExcludedTasks((s) => toggle(s, taskId))}
                       />
@@ -159,8 +159,7 @@ export const InvoiceEditor: React.FC<{ initialClientId?: string; onClose: () => 
               {openMilestones.map(({ project, milestone }) => (
                 <li key={milestone.id}>
                   <label className="flex items-center gap-3 py-2 text-[13px] cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedMilestones.has(milestone.id)}
                       onChange={() => setSelectedMilestones((s) => toggle(s, milestone.id))}
                     />

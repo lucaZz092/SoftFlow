@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
 import { Task } from '../../types';
+import { Checkbox } from '../ui/Checkbox';
 
 export const TAG_COLORS = ['#3b63f3', '#00c875', '#fdab3d', '#e2445c', '#a25ddc', '#0086c0', '#ff642e', '#7f8c8d'];
 
@@ -58,7 +59,7 @@ export const TagPicker: React.FC<{ task: Task }> = ({ task }) => {
                 key={t.id}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
               >
-                <input type="checkbox" checked={Boolean(task.tags?.includes(t.id))} onChange={() => toggleTaskTag(task.id, t.id)} />
+                <Checkbox size="sm" checked={Boolean(task.tags?.includes(t.id))} onChange={() => toggleTaskTag(task.id, t.id)} />
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
                 <span className="truncate">{t.name}</span>
               </label>

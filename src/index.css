@@ -103,3 +103,98 @@
 .text-primary-theme { color: var(--text-primary); }
 .text-secondary-theme { color: var(--text-secondary); }
 .text-muted-theme { color: var(--text-muted); }
+
+/* Animated checkbox (src/components/ui/Checkbox.tsx) */
+.sf-checkbox {
+  --sf-checkbox-size: 1rem;
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: var(--sf-checkbox-size);
+  height: var(--sf-checkbox-size);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.sf-checkbox--sm {
+  --sf-checkbox-size: 0.875rem;
+}
+
+.sf-checkbox input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sf-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.sf-checkbox svg {
+  width: 100%;
+  height: 100%;
+  opacity: 0.7;
+  pointer-events: none;
+  transition: opacity 150ms ease, color 150ms ease;
+}
+
+.sf-checkbox:hover svg,
+.sf-checkbox-label:hover .sf-checkbox svg {
+  opacity: 0.85;
+}
+
+.sf-checkbox input:checked ~ svg {
+  opacity: 1;
+  color: var(--accent-primary);
+}
+
+.sf-checkbox input:disabled ~ svg {
+  opacity: 0.35;
+}
+
+.sf-checkbox input:focus-visible ~ svg {
+  outline: 2px solid var(--ring-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Unchecked: full rounded square. Checked: the square opens where the check mark exits. */
+.sf-checkbox svg rect {
+  stroke-dasharray: 88 0;
+  stroke-dashoffset: 73;
+  transition: stroke-dasharray 100ms ease;
+}
+
+.sf-checkbox input:checked ~ svg rect {
+  stroke-dasharray: 80 18;
+}
+
+.sf-checkbox svg polyline {
+  stroke-dasharray: 0 30;
+  stroke-dashoffset: 1;
+  transition: stroke-dasharray 150ms ease;
+}
+
+.sf-checkbox input:checked ~ svg polyline {
+  stroke-dasharray: 30 30;
+}
+
+.sf-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--sf-checkbox-size, 1rem) / 2.5 + 0.25rem);
+  cursor: pointer;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-checkbox svg,
+  .sf-checkbox svg rect,
+  .sf-checkbox svg polyline {
+    transition: none;
+  }
+}
