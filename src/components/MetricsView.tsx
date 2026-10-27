@@ -33,9 +33,6 @@ export const MetricsView: React.FC = () => {
     style: PRIORITY_STYLES[p] || PRIORITY_STYLES['Média'],
   }));
 
-  const claudeRuns = runLogs.filter((l) => l.integrationType === 'Claude').length;
-  const codexRuns = runLogs.filter((l) => l.integrationType === 'Codex').length;
-  const gitHubRuns = runLogs.filter((l) => l.integrationType === 'GitHub').length;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-none bg-[var(--bg-canvas)] transition-colors">
@@ -47,7 +44,7 @@ export const MetricsView: React.FC = () => {
             <span>Métricas de Entrega &amp; Eficiência</span>
           </h1>
           <p className="text-xs text-[var(--text-secondary)] mt-1">
-            Indicadores de fluxo contínuo e telemetria de automações com Claude, Codex e GitHub.
+            Indicadores de fluxo das demandas.
           </p>
         </div>
       </div>
@@ -151,51 +148,6 @@ export const MetricsView: React.FC = () => {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </div>
-
-      {/* Model & Webhook Usage */}
-      <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-3.5 shadow-xs">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-          Uso das Integrações Ativas
-        </h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-3.5">
-            <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500 shrink-0">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-base font-bold text-[var(--text-primary)] font-mono tabular-nums">
-                {claudeRuns} Refinamentos
-              </div>
-              <div className="text-xs text-[var(--text-muted)]">Claude 3.5 Sonnet</div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-3.5">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
-              <Zap className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-base font-bold text-[var(--text-primary)] font-mono tabular-nums">
-                {codexRuns} Testes Gerados
-              </div>
-              <div className="text-xs text-[var(--text-muted)]">Codex Test Engine</div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] flex items-center gap-3.5">
-            <div className="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
-              <GitBranch className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-base font-bold text-[var(--text-primary)] font-mono tabular-nums">
-                {gitHubRuns} Eventos PR
-              </div>
-              <div className="text-xs text-[var(--text-muted)]">GitHub Actions Webhook</div>
-            </div>
           </div>
         </div>
       </div>

@@ -23,36 +23,8 @@ export interface Comment {
   avatar?: string;
   text: string;
   timestamp: string;
-  isAi?: boolean;
-  aiModel?: 'Claude' | 'Codex' | 'GitHub' | 'System';
-}
-
-export interface GitHubIntegrationData {
-  repo: string;
-  branch?: string;
-  prNumber?: number;
-  prTitle?: string;
-  prStatus?: 'open' | 'merged' | 'draft' | 'closed';
-  commitsCount?: number;
-  checksPassing?: boolean;
-}
-
-export interface ClaudeIntegrationData {
-  refinedAt?: string;
-  userStory?: string;
-  acceptanceCriteria?: string[];
-  complexityScore?: 'P' | 'M' | 'G' | 'GG';
-  estimatedHours?: number;
-  summary?: string;
-}
-
-export interface CodexIntegrationData {
-  lastRunAt?: string;
-  codeSnippet?: string;
-  generatedTests?: string;
-  reviewScore?: number;
-  reviewSummary?: string;
-  testsPassing?: boolean;
+  /** Comment written by the app (e.g. by an automation) rather than a person */
+  isSystem?: boolean;
 }
 
 export interface CustomColumn {
@@ -76,14 +48,112 @@ export interface Task {
   };
   subtasks: Subtask[];
   comments: Comment[];
-  integrations: {
-    github?: GitHubIntegrationData;
-    claude?: ClaudeIntegrationData;
-    codex?: CodexIntegrationData;
-  };
   customFields?: Record<string, string | number>;
+  /** Tag ids (see Tag) */
+  tags?: string[];
+  /** When set, completing the task creates the next occurrence */
+  recurrence?: Recurrence;
+  /** Ids of tasks that must be done before this one */
+  blockedBy?: string[];
+  /** URLs of GitHub pull requests or issues */
+  githubLinks?: string[];
+  timeEntries?: TimeEntry[];
+  attachments?: Attachment[];
+  /** Client whose hourly rate applies to this task's time (billing) */
+  clientId?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Recurrence {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  /** Repeat every N periods */
+  interval: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  /** ISO timestamps; `end` is null while the timer is running */
+  start: string;
+  end: string | null;
+  note?: string;
+  /** Invoice that billed this entry */
+  invoiceId?: string;
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  /** Path inside the Supabase Storage bucket */
+  path: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// --- Billing ---
+
+export interface Client {
+  id: string;
+  name: string;
+  email?: string;
+  document?: string;
+  /** BRL per hour, for time-based billing */
+  hourlyRate: number;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  amount: number;
+  dueDate?: string;
+  invoiceId?: string;
+}
+
+/** Fixed-price project, billed in milestones */
+export interface BillingProject {
+  id: string;
+  clientId: string;
+  name: string;
+  totalValue: number;
+  milestones: Milestone[];
+  createdAt: string;
+}
+
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
+
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  /** What generated this line, so it can be released if the invoice is cancelled */
+  source?:
+    | { type: 'time'; taskId: string; entryIds: string[] }
+    | { type: 'milestone'; projectId: string; milestoneId: string };
+}
+
+export interface Invoice {
+  id: string;
+  /** Sequential number shown to the client, e.g. 2026-007 */
+  number: string;
+  clientId: string;
+  issueDate: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  items: InvoiceItem[];
+  paidAt?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface Group {
@@ -103,17 +173,10 @@ export interface Board {
 
 export type AutomationTriggerType =
   | 'STATUS_CHANGE'
-  | 'GITHUB_PR_MERGED'
-  | 'GITHUB_PR_OPENED'
   | 'TASK_CREATED'
-  | 'PRIORITY_SET_CRITICAL'
-  | 'CODEX_TEST_PASS'
-  | 'CLAUDE_REFINE_REQUEST';
+  | 'PRIORITY_SET_CRITICAL';
 
 export type AutomationActionType =
-  | 'CLAUDE_REFINE'
-  | 'CODEX_GENERATE_TESTS'
-  | 'GITHUB_CREATE_BRANCH'
   | 'SET_STATUS'
   | 'MOVE_TO_GROUP'
   | 'ASSIGN_USER'
@@ -140,7 +203,6 @@ export interface AutomationWorkflow {
     label: string;
     targetStatus?: TaskStatus;
     targetGroupId?: string;
-    integrationIcon?: 'claude' | 'codex' | 'github' | 'monday';
   };
   executionCount: number;
   lastRunAt?: string;
@@ -155,7 +217,15 @@ export interface AutomationRunLog {
   timestamp: string;
   status: 'success' | 'failed' | 'running';
   details: string;
-  integrationType: 'Claude' | 'Codex' | 'GitHub' | 'Workflow';
 }
 
-export type ViewType = 'overview' | 'table' | 'kanban' | 'timeline' | 'automations' | 'metrics';
+export type ViewType =
+  | 'overview'
+  | 'table'
+  | 'kanban'
+  | 'timeline'
+  | 'github'
+  | 'billing'
+  | 'archive'
+  | 'automations'
+  | 'metrics';

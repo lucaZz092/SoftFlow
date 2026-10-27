@@ -1,34 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  X,
-  MessageSquare,
-  GitBranch,
-  Bot,
-  Zap,
-  CheckSquare,
-  Send,
-  Sparkles,
-  Copy,
-  Check,
-  Play,
-  CheckCircle2,
-  GitPullRequest,
-  Plus,
-  Clock,
-  User,
-  AlertCircle,
-  FileCode,
-} from 'lucide-react';
+import { X, MessageSquare, CheckSquare, Send, Plus, Info, Clock, Paperclip, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
-import { TEAM_MEMBERS } from '../data/mockData';
 import { TaskStatus, TaskPriority } from '../types';
 import { Button } from './ui/Button';
+import { TaskDetailsTab } from './task/TaskDetailsTab';
+import { TaskTimeTab } from './task/TaskTimeTab';
+import { TaskAttachmentsTab } from './task/TaskAttachmentsTab';
+
+type DrawerTab = 'details' | 'comments' | 'subtasks' | 'time' | 'attachments';
 
 export const TaskDetailDrawer: React.FC = () => {
   const {
-    tasks,
+    members,
+    allTasks,
     groups,
     selectedTaskId,
     setSelectedTaskId,
@@ -38,20 +24,14 @@ export const TaskDetailDrawer: React.FC = () => {
     toggleSubtask,
     addSubtask,
     addComment,
-    simulateClaudeRefine,
-    simulateCodexTestGeneration,
-    createGitHubBranch,
-    createGitHubPR,
+    archiveTask,
+    unarchiveTask,
+    deleteTask,
   } = useProject();
 
-  const [activeTab, setActiveTab] = useState<'comments' | 'subtasks' | 'github' | 'claude' | 'codex'>('comments');
+  const [activeTab, setActiveTab] = useState<DrawerTab>('details');
   const [commentInput, setCommentInput] = useState('');
   const [newSubtaskInput, setNewSubtaskInput] = useState('');
-  const [copiedCode, setCopiedCode] = useState(false);
-
-  // Custom branch / PR inputs
-  const [newBranchInput, setNewBranchInput] = useState('');
-  const [newPrTitleInput, setNewPrTitleInput] = useState('');
 
   // Close on ESC
   useEffect(() => {
@@ -66,7 +46,7 @@ export const TaskDetailDrawer: React.FC = () => {
 
   if (!selectedTaskId) return null;
 
-  const task = tasks.find((t) => t.id === selectedTaskId);
+  const task = allTasks.find((t) => t.id === selectedTaskId);
   if (!task) return null;
 
   const taskGroup = groups.find((g) => g.id === task.groupId);
@@ -86,30 +66,6 @@ export const TaskDetailDrawer: React.FC = () => {
       addSubtask(task.id, newSubtaskInput.trim());
       setNewSubtaskInput('');
     }
-  };
-
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const handleCreateBranchAction = () => {
-    const branch =
-      newBranchInput.trim() ||
-      `feature/${task.id.slice(-4)}-${task.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .slice(0, 15)}`;
-    createGitHubBranch(task.id, branch);
-    setNewBranchInput('');
-  };
-
-  const handleCreatePRAction = () => {
-    const title = newPrTitleInput.trim() || `feat: ${task.title}`;
-    const branch = task.integrations.github?.branch || `feature/${task.id.slice(-4)}`;
-    createGitHubPR(task.id, title, branch);
-    setNewPrTitleInput('');
   };
 
   return (
@@ -152,14 +108,34 @@ export const TaskDetailDrawer: React.FC = () => {
               />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedTaskId(null)}
-              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
-              aria-label="Fechar gaveta"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => (task.archivedAt ? unarchiveTask(task.id) : archiveTask(task.id))}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+                title={task.archivedAt ? 'Restaurar do arquivo' : 'Arquivar'}
+                aria-label={task.archivedAt ? 'Restaurar do arquivo' : 'Arquivar'}
+              >
+                {task.archivedAt ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteTask(task.id)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-500 hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+                title="Excluir"
+                aria-label="Excluir demanda"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTaskId(null)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+                aria-label="Fechar gaveta"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Quick Attributes Bar */}
@@ -202,13 +178,13 @@ export const TaskDetailDrawer: React.FC = () => {
               <select
                 value={task.assignee?.id || ''}
                 onChange={(e) => {
-                  const member = TEAM_MEMBERS.find((m) => m.id === e.target.value) || null;
+                  const member = members.find((m) => m.id === e.target.value) || null;
                   updateTask(task.id, { assignee: member });
                 }}
                 className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
               >
                 <option value="">Sem responsável</option>
-                {TEAM_MEMBERS.map((m) => (
+                {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
                   </option>
@@ -229,124 +205,57 @@ export const TaskDetailDrawer: React.FC = () => {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex items-center border-b border-[var(--border-subtle)] px-4 sm:px-5 bg-[var(--bg-surface)] text-xs font-medium overflow-x-auto scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setActiveTab('comments')}
-              className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
-                activeTab === 'comments'
-                  ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] font-semibold'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Atualizações ({task.comments.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('subtasks')}
-              className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
-                activeTab === 'subtasks'
-                  ? 'border-[var(--accent-primary)] text-[var(--accent-primary)] font-semibold'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span>Sub-tarefas ({task.subtasks.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('github')}
-              className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
-                activeTab === 'github'
-                  ? 'border-purple-500 text-purple-600 dark:text-purple-400 font-semibold'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <GitBranch className="w-3.5 h-3.5 text-purple-500" />
-              <span>GitHub PR</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('claude')}
-              className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
-                activeTab === 'claude'
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Bot className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Claude Stories</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('codex')}
-              className={`flex items-center gap-1.5 py-3 px-3 border-b-2 transition-colors cursor-pointer shrink-0 ${
-                activeTab === 'codex'
-                  ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-semibold'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
-              <span>Codex Testes</span>
-            </button>
+          <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] px-4 sm:px-5 bg-[var(--bg-surface)] text-xs font-medium overflow-x-auto scrollbar-none">
+            {(
+              [
+                { id: 'details', label: 'Detalhes', icon: Info },
+                { id: 'comments', label: `Comentários (${task.comments.length})`, icon: MessageSquare },
+                { id: 'subtasks', label: `Sub-tarefas (${task.subtasks.length})`, icon: CheckSquare },
+                { id: 'time', label: 'Tempo', icon: Clock },
+                { id: 'attachments', label: `Anexos (${task.attachments?.length ?? 0})`, icon: Paperclip },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-1.5 py-3 px-2.5 border-b-2 -mb-px transition-colors cursor-pointer shrink-0 ${
+                  activeTab === id
+                    ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
+                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 text-xs space-y-4">
+            {activeTab === 'details' && <TaskDetailsTab task={task} />}
+            {activeTab === 'time' && <TaskTimeTab task={task} />}
+            {activeTab === 'attachments' && <TaskAttachmentsTab task={task} />}
+
             {/* TAB 1: Comments */}
             {activeTab === 'comments' && (
               <div className="flex flex-col h-full space-y-4">
-                {/* Description */}
-                <div className="p-3.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-1.5">
-                  <span className="font-semibold text-[var(--text-muted)] uppercase text-[10px] tracking-wider block">
-                    Descrição da Demanda
-                  </span>
-                  <textarea
-                    rows={2}
-                    value={task.description}
-                    onChange={(e) => updateTask(task.id, { description: e.target.value })}
-                    className="w-full bg-transparent text-[var(--text-primary)] outline-none resize-none text-xs leading-relaxed"
-                    placeholder="Adicione uma descrição detalhada..."
-                  />
-                </div>
-
                 {/* Comments Feed */}
                 <div className="flex-1 space-y-3 overflow-y-auto pr-1">
                   {task.comments.map((comm) => (
                     <div
                       key={comm.id}
-                      className={`p-3.5 rounded-xl border transition-colors ${
-                        comm.isAi
-                          ? comm.aiModel === 'Codex'
-                            ? 'bg-amber-500/10 border-amber-500/30'
-                            : comm.aiModel === 'Claude'
-                            ? 'bg-indigo-500/10 border-indigo-500/30'
-                            : 'bg-purple-500/10 border-purple-500/30'
-                          : 'bg-[var(--bg-canvas)] border-[var(--border-subtle)]'
+                      className={`p-3.5 rounded-xl border transition-colors border-[var(--border-subtle)] ${
+                        comm.isSystem ? 'bg-transparent' : 'bg-[var(--bg-canvas)]'
                       }`}
                     >
                       <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-subtle)]">
                         <div className="flex items-center gap-2">
-                          {comm.isAi ? (
-                            <span className="p-1 rounded-md bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
-                              {comm.aiModel === 'Codex' ? (
-                                <Zap className="w-3 h-3 text-amber-500" />
-                              ) : comm.aiModel === 'Claude' ? (
-                                <Bot className="w-3 h-3 text-indigo-500" />
-                              ) : (
-                                <GitBranch className="w-3 h-3 text-purple-500" />
-                              )}
-                            </span>
-                          ) : comm.avatar ? (
+                          {comm.avatar ? (
                             <img src={comm.avatar} alt={comm.author} className="w-5 h-5 rounded-full" />
                           ) : (
-                            <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] text-white font-bold text-[10px] flex items-center justify-center">
-                              LM
+                            <div className="w-5 h-5 rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] font-semibold text-[10px] flex items-center justify-center">
+                              {comm.author.slice(0, 1).toUpperCase()}
                             </div>
                           )}
                           <span className="font-semibold text-[var(--text-primary)] text-xs">{comm.author}</span>
@@ -438,252 +347,6 @@ export const TaskDetailDrawer: React.FC = () => {
                     <p className="text-[var(--text-muted)] text-center py-6">Nenhuma sub-tarefa cadastrada.</p>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* TAB 3: GitHub Integration */}
-            {activeTab === 'github' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="w-4 h-4 text-purple-500" />
-                      <span className="font-bold text-[var(--text-primary)] text-xs">
-                        Vínculo de Repositório &amp; Pull Request
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-300 uppercase font-semibold">
-                      {task.integrations.github?.prStatus || 'Branch Conectada'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
-                    <div>
-                      <span className="text-[10px] text-[var(--text-muted)] uppercase block font-semibold">
-                        Repositório:
-                      </span>
-                      <div className="font-mono text-[var(--text-primary)] text-xs truncate">
-                        {task.integrations.github?.repo || 'preventsenior/soft-solutions-core'}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[var(--text-muted)] uppercase block font-semibold">Branch:</span>
-                      <div className="font-mono text-purple-600 dark:text-purple-300 text-xs truncate">
-                        {task.integrations.github?.branch || `feature/${task.id}-dev`}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[var(--text-muted)] uppercase block font-semibold">
-                        Pull Request:
-                      </span>
-                      <div className="font-medium text-[var(--text-primary)] truncate">
-                        #{task.integrations.github?.prNumber || 42} - {task.integrations.github?.prTitle || task.title}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[var(--text-muted)] uppercase block font-semibold">
-                        Status Checks CI:
-                      </span>
-                      <div className="text-emerald-500 font-medium flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Checks Aprovados</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Working GitHub Actions Bar */}
-                <div className="p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] space-y-3.5">
-                  <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider block">
-                    Ações Diretas no GitHub (via PAT)
-                  </span>
-
-                  {/* Create Branch */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] text-[var(--text-muted)]">Criar Nova Branch Padronizada:</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newBranchInput}
-                        onChange={(e) => setNewBranchInput(e.target.value)}
-                        placeholder={`feature/${task.id.slice(-4)}-sua-branch`}
-                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs font-mono outline-none focus:border-[var(--accent-primary)]"
-                      />
-                      <Button variant="secondary" size="sm" onClick={handleCreateBranchAction}>
-                        Criar Branch
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Open PR */}
-                  <div className="space-y-1.5 pt-3 border-t border-[var(--border-subtle)]">
-                    <span className="text-[11px] text-[var(--text-muted)]">Abrir Novo Pull Request:</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newPrTitleInput}
-                        onChange={(e) => setNewPrTitleInput(e.target.value)}
-                        placeholder={`feat: ${task.title}`}
-                        className="flex-1 bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs outline-none focus:border-[var(--accent-primary)]"
-                      />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleCreatePRAction}
-                        leftIcon={<GitPullRequest className="w-3 h-3" />}
-                      >
-                        Abrir PR
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 4: Claude Integration */}
-            {activeTab === 'claude' && (
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-indigo-500" />
-                    <span className="font-bold text-[var(--text-primary)] text-xs">
-                      Refinamento Ágil com Claude 3.5 Sonnet
-                    </span>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => simulateClaudeRefine(task.id)}
-                    leftIcon={<Sparkles className="w-3.5 h-3.5" />}
-                  >
-                    Refinar Demanda Agora
-                  </Button>
-                </div>
-
-                {task.integrations.claude ? (
-                  <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-3.5">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 block mb-1">
-                        História de Usuário Gerada:
-                      </span>
-                      <p className="text-[var(--text-primary)] italic font-serif leading-relaxed text-xs">
-                        "{task.integrations.claude.userStory}"
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 block mb-1.5">
-                        Critérios de Aceite:
-                      </span>
-                      <ul className="space-y-1.5">
-                        {task.integrations.claude.acceptanceCriteria?.map((crit, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-[var(--text-secondary)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0 mt-1.5" />
-                            <span>{crit}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="flex items-center gap-4 pt-2.5 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)]">
-                      <span>
-                        Complexidade:{' '}
-                        <strong className="text-[var(--text-primary)]">
-                          {task.integrations.claude.complexityScore || 'M'}
-                        </strong>
-                      </span>
-                      <span>
-                        Estimativa:{' '}
-                        <strong className="text-[var(--text-primary)]">
-                          {task.integrations.claude.estimatedHours || 6}h
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-xl space-y-2">
-                    <Bot className="w-6 h-6 mx-auto text-indigo-500" />
-                    <p className="text-xs">Nenhum refinamento gerado ainda para esta demanda.</p>
-                    <Button variant="ghost" size="sm" onClick={() => simulateClaudeRefine(task.id)}>
-                      Clique para acionar o Claude
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 5: Codex Integration */}
-            {activeTab === 'codex' && (
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    <span className="font-bold text-[var(--text-primary)] text-xs">
-                      Engenharia de Testes com Codex (Vitest)
-                    </span>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => simulateCodexTestGeneration(task.id)}
-                    leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
-                  >
-                    Gerar Testes Agora
-                  </Button>
-                </div>
-
-                {task.integrations.codex ? (
-                  <div className="space-y-3.5">
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-[var(--text-primary)]">Revisão de Código Concluída</div>
-                        <div className="text-[11px] text-[var(--text-muted)]">
-                          {task.integrations.codex.reviewSummary}
-                        </div>
-                      </div>
-                      <span className="text-emerald-500 font-semibold text-xs flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Aprovados</span>
-                      </span>
-                    </div>
-
-                    {task.integrations.codex.generatedTests && (
-                      <div className="rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-hidden shadow-xs">
-                        <div className="px-3.5 py-2 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileCode className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
-                              suite.test.ts (Vitest)
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyCode(task.integrations.codex?.generatedTests || '')}
-                            className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer px-2 py-0.5 rounded hover:bg-[var(--bg-surface-hover)] transition-colors"
-                          >
-                            {copiedCode ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                            <span>{copiedCode ? 'Copiado!' : 'Copiar'}</span>
-                          </button>
-                        </div>
-                        <pre className="p-4 text-xs font-mono text-emerald-600 dark:text-emerald-400 overflow-x-auto leading-relaxed bg-[var(--bg-canvas)]">
-                          {task.integrations.codex.generatedTests}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-xl space-y-2">
-                    <Zap className="w-6 h-6 mx-auto text-amber-500" />
-                    <p className="text-xs">Nenhum teste gerado ainda pelo Codex.</p>
-                    <Button variant="ghost" size="sm" onClick={() => simulateCodexTestGeneration(task.id)}>
-                      Gerar suite de testes unitários com Codex
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
           </div>

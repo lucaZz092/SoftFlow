@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Search,
   User,
+  Tag as TagIcon,
   Filter,
   ArrowUpDown,
   EyeOff,
@@ -13,11 +14,11 @@ import {
   Check,
 } from 'lucide-react';
 import { useProject, SortField, GroupByOption } from '../context/ProjectContext';
-import { TEAM_MEMBERS } from '../data/mockData';
 import { Button } from './ui/Button';
 
 export const BoardToolbar: React.FC = () => {
   const {
+    members,
     addTask,
     groups,
     searchQuery,
@@ -28,6 +29,9 @@ export const BoardToolbar: React.FC = () => {
     setFilterPriority,
     filterAssigneeId,
     setFilterAssigneeId,
+    filterTagId,
+    setFilterTagId,
+    tags,
     sortBy,
     setSortBy,
     hiddenColumns,
@@ -41,6 +45,7 @@ export const BoardToolbar: React.FC = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showHideDropdown, setShowHideDropdown] = useState(false);
   const [showGroupDropdown, setShowGroupDropdown] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +58,7 @@ export const BoardToolbar: React.FC = () => {
         setShowSortDropdown(false);
         setShowHideDropdown(false);
         setShowGroupDropdown(false);
+        setShowTagDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -64,12 +70,14 @@ export const BoardToolbar: React.FC = () => {
     addTask(targetGroup.id, 'Nova Demanda');
   };
 
-  const hasActiveFilters = Boolean(filterStatus || filterPriority || filterAssigneeId || searchQuery || sortBy);
+  const hasActiveFilters = Boolean(filterStatus || filterPriority || filterAssigneeId || filterTagId || searchQuery || sortBy);
+  const activeTag = tags.find((t) => t.id === filterTagId);
 
   const clearFilters = () => {
     setFilterStatus(null);
     setFilterPriority(null);
     setFilterAssigneeId(null);
+    setFilterTagId(null);
     setSearchQuery('');
     setSortBy(null);
   };
@@ -80,7 +88,6 @@ export const BoardToolbar: React.FC = () => {
     { id: 'dueDate', label: 'Prazo' },
     { id: 'priority', label: 'Prioridade' },
     { id: 'timeline', label: 'Cronograma' },
-    { id: 'integrations', label: 'Integrações (Git/IA)' },
   ];
 
   return (
@@ -151,7 +158,7 @@ export const BoardToolbar: React.FC = () => {
                 <span>Todos os membros</span>
                 {!filterAssigneeId && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
               </button>
-              {TEAM_MEMBERS.map((m) => (
+              {members.map((m) => (
                 <button
                   type="button"
                   key={m.id}
@@ -171,6 +178,61 @@ export const BoardToolbar: React.FC = () => {
                     <span className="truncate">{m.name}</span>
                   </div>
                   {filterAssigneeId === m.id && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Etiqueta filter */}
+        <div className="relative">
+          <Button
+            variant={filterTagId ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setShowTagDropdown(!showTagDropdown);
+              setShowPersonDropdown(false);
+              setShowFilterDropdown(false);
+              setShowSortDropdown(false);
+              setShowHideDropdown(false);
+              setShowGroupDropdown(false);
+            }}
+            leftIcon={<TagIcon className="w-3.5 h-3.5" />}
+          >
+            {activeTag ? activeTag.name : 'Etiqueta'}
+          </Button>
+
+          {showTagDropdown && (
+            <div className="absolute left-0 top-full mt-1.5 w-52 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-30 space-y-0.5 max-h-72 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterTagId(null);
+                  setShowTagDropdown(false);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center justify-between text-left text-xs transition-colors"
+              >
+                <span>Todas as etiquetas</span>
+                {!filterTagId && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
+              </button>
+              {tags.length === 0 && (
+                <p className="px-2.5 py-1.5 text-xs text-[var(--text-muted)]">Crie etiquetas na aba Detalhes de uma demanda.</p>
+              )}
+              {tags.map((t) => (
+                <button
+                  type="button"
+                  key={t.id}
+                  onClick={() => {
+                    setFilterTagId(t.id);
+                    setShowTagDropdown(false);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-primary)] cursor-pointer flex items-center justify-between text-left text-xs transition-colors"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                    <span className="truncate">{t.name}</span>
+                  </span>
+                  {filterTagId === t.id && <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent-primary)] shrink-0" />}
                 </button>
               ))}
             </div>

@@ -16,7 +16,7 @@ export const NewAutomationModal: React.FC = () => {
   const [description, setDescription] = useState('');
   const [triggerType, setTriggerType] = useState<AutomationTriggerType>('STATUS_CHANGE');
   const [targetStatus, setTargetStatus] = useState<TaskStatus>('Em Revisão');
-  const [actionType, setActionType] = useState<AutomationActionType>('CODEX_GENERATE_TESTS');
+  const [actionType, setActionType] = useState<AutomationActionType>('SET_STATUS');
   const [actionStatus, setActionStatus] = useState<TaskStatus>('Pronto');
   const [actionGroup, setActionGroup] = useState<string>(groups[0]?.id || 'group-marketing');
 
@@ -37,33 +37,18 @@ export const NewAutomationModal: React.FC = () => {
 
     let triggerLabel = 'Quando o evento acontecer';
     if (triggerType === 'STATUS_CHANGE') triggerLabel = `Quando o status mudar para "${targetStatus}"`;
-    if (triggerType === 'GITHUB_PR_MERGED') triggerLabel = 'Quando um PR for mesclado no GitHub';
-    if (triggerType === 'GITHUB_PR_OPENED') triggerLabel = 'Quando um novo PR for aberto no GitHub';
     if (triggerType === 'TASK_CREATED') triggerLabel = 'Quando uma nova demanda for criada';
     if (triggerType === 'PRIORITY_SET_CRITICAL') triggerLabel = 'Quando a prioridade for definida como Crítica';
 
     let actionLabel = 'Executar ação';
-    let icon: 'claude' | 'codex' | 'github' | 'monday' = 'monday';
 
-    if (actionType === 'CODEX_GENERATE_TESTS') {
-      actionLabel = 'Gerar suíte de testes unitários com Codex';
-      icon = 'codex';
-    } else if (actionType === 'CLAUDE_REFINE') {
-      actionLabel = 'Refinar critérios de aceite e histórias com Claude';
-      icon = 'claude';
-    } else if (actionType === 'GITHUB_CREATE_BRANCH') {
-      actionLabel = 'Criar branch feature/ no repositório GitHub';
-      icon = 'github';
-    } else if (actionType === 'SET_STATUS') {
+    if (actionType === 'SET_STATUS') {
       actionLabel = `Alterar status para "${actionStatus}"`;
-      icon = 'monday';
     } else if (actionType === 'MOVE_TO_GROUP') {
       const gTitle = groups.find((g) => g.id === actionGroup)?.title || 'outro grupo';
       actionLabel = `Mover para o grupo "${gTitle}"`;
-      icon = 'monday';
     } else if (actionType === 'NOTIFY_TEAM') {
-      actionLabel = 'Disparar notificação de bloqueio para o time';
-      icon = 'monday';
+      actionLabel = 'Registrar alerta na demanda';
     }
 
     addAutomation({
@@ -80,7 +65,6 @@ export const NewAutomationModal: React.FC = () => {
         label: actionLabel,
         targetStatus: actionType === 'SET_STATUS' ? actionStatus : undefined,
         targetGroupId: actionType === 'MOVE_TO_GROUP' ? actionGroup : undefined,
-        integrationIcon: icon,
       },
     });
 
@@ -154,8 +138,6 @@ export const NewAutomationModal: React.FC = () => {
               className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
             >
               <option value="STATUS_CHANGE">O status de uma demanda for alterado</option>
-              <option value="GITHUB_PR_MERGED">Um Pull Request for mesclado no GitHub</option>
-              <option value="GITHUB_PR_OPENED">Um novo Pull Request for aberto no GitHub</option>
               <option value="TASK_CREATED">Uma nova demanda for criada no quadro</option>
               <option value="PRIORITY_SET_CRITICAL">A prioridade for alterada para Crítica</option>
             </select>
@@ -188,12 +170,9 @@ export const NewAutomationModal: React.FC = () => {
               onChange={(e) => setActionType(e.target.value as AutomationActionType)}
               className="w-full bg-[var(--bg-surface)] text-[var(--text-primary)] px-3 py-2 rounded-lg border border-[var(--border-subtle)] outline-none text-xs cursor-pointer focus:border-[var(--accent-primary)]"
             >
-              <option value="CODEX_GENERATE_TESTS">Acionar Codex para gerar testes unitários (Vitest)</option>
-              <option value="CLAUDE_REFINE">Acionar Claude para refinar histórias e critérios</option>
-              <option value="GITHUB_CREATE_BRANCH">Criar branch padronizada feature/ no GitHub</option>
               <option value="SET_STATUS">Alterar status da demanda</option>
               <option value="MOVE_TO_GROUP">Mover demanda para outro grupo</option>
-              <option value="NOTIFY_TEAM">Notificar a equipe de engenharia</option>
+              <option value="NOTIFY_TEAM">Registrar alerta na demanda</option>
             </select>
 
             {actionType === 'SET_STATUS' && (

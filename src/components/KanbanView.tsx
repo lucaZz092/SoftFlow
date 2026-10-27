@@ -6,6 +6,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { TaskBadges } from './task/TaskBadges';
 import { TaskStatus } from '../types';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
 
@@ -17,6 +18,7 @@ export const KanbanView: React.FC = () => {
     filterStatus,
     filterPriority,
     filterAssigneeId,
+    filterTagId,
     moveTaskToStatus,
     setSelectedTaskId,
     addTask,
@@ -37,6 +39,7 @@ export const KanbanView: React.FC = () => {
     if (filterStatus && task.status !== filterStatus) return false;
     if (filterPriority && task.priority !== filterPriority) return false;
     if (filterAssigneeId && task.assignee?.id !== filterAssigneeId) return false;
+    if (filterTagId && !task.tags?.includes(filterTagId)) return false;
     return true;
   });
 
@@ -145,30 +148,7 @@ export const KanbanView: React.FC = () => {
                       <div className="font-semibold text-xs text-[var(--text-primary)] leading-snug group-hover:text-[var(--accent-primary)] transition-colors">
                         {task.title}
                       </div>
-
-                      {/* Integrations */}
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        {task.integrations.github?.prNumber && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center gap-1">
-                            <GitBranch className="w-3 h-3" />
-                            <span>PR #{task.integrations.github.prNumber}</span>
-                          </span>
-                        )}
-
-                        {task.integrations.codex && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                            <Zap className="w-3 h-3" />
-                            <span>Vitest</span>
-                          </span>
-                        )}
-
-                        {task.integrations.claude && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-[var(--accent-primary)] border border-blue-500/20 flex items-center gap-1">
-                            <Bot className="w-3 h-3" />
-                            <span>Claude</span>
-                          </span>
-                        )}
-                      </div>
+                      <TaskBadges task={task} />
 
                       {/* Footer: Assignee, DueDate, and quick status move */}
                       <div className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)]">

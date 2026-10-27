@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Task,
   Group,
@@ -9,42 +9,68 @@ import {
   TaskPriority,
   ViewType,
   CustomColumn,
+  Tag,
+  Attachment,
+  Recurrence,
 } from '../types';
-import {
-  INITIAL_TASKS,
-  INITIAL_GROUPS,
-  INITIAL_AUTOMATIONS,
-  INITIAL_RUN_LOGS,
-  CURRENT_USER,
-} from '../data/mockData';
+import { DEFAULT_GROUPS, DEFAULT_AUTOMATIONS, DEFAULT_CUSTOM_COLUMNS } from '../data/defaults';
+import { useSyncedCollection } from '../lib/useSyncedCollection';
+import { supabase } from '../lib/supabase';
+import { toAssignee, useAuth } from './AuthContext';
+import { localDate } from '../lib/dates';
+import { nextOccurrence } from '../lib/recurrence';
+import { parseGithubLink } from '../lib/githubLinks';
+import { findRunningEntry } from '../lib/time';
 
 export interface ToastMessage {
   id: string;
   title: string;
   description: string;
-  type: 'automation' | 'github' | 'claude' | 'codex' | 'info';
+  type: 'automation' | 'info';
   timestamp: string;
+  action?: { label: string; onClick: () => void };
+}
+
+/** A status change waiting for confirmation because the task still has open blockers */
+export interface PendingStatusChange {
+  taskId: string;
+  status: TaskStatus;
+  blockers: Task[];
 }
 
 export type SortField = 'dueDate' | 'priority' | 'title';
 export type GroupByOption = 'group' | 'status' | 'assignee';
 
 interface ProjectContextType {
+  /** Active (non-archived) tasks */
   tasks: Task[];
+  archivedTasks: Task[];
+  /** Every task, archived included */
+  allTasks: Task[];
+  tags: Tag[];
   groups: Group[];
   automations: AutomationWorkflow[];
   runLogs: AutomationRunLog[];
+  isDataLoaded: boolean;
+  syncError: string | null;
+  currentUser: Assignee;
+  members: Assignee[];
   currentView: ViewType;
   selectedTaskId: string | null;
   searchQuery: string;
   filterStatus: string | null;
   filterPriority: string | null;
   filterAssigneeId: string | null;
+  filterTagId: string | null;
   toasts: ToastMessage[];
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+  pendingStatusChange: PendingStatusChange | null;
+  confirmPendingStatusChange: () => void;
+  cancelPendingStatusChange: () => void;
   isIntegrationsOpen: boolean;
   isNewAutomationOpen: boolean;
-  isAiModalOpen: boolean;
-  
+
   // Custom Columns & Display Preferences
   customColumns: CustomColumn[];
   hiddenColumns: string[];
@@ -52,17 +78,12 @@ interface ProjectContextType {
   groupBy: GroupByOption;
   selectedTaskIds: string[];
 
-  // GitHub Auth State
-  githubToken: string;
-  isGithubConnected: boolean;
-  githubUser: string;
-
   // Theme & Responsiveness
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (open: boolean) => void;
-  
+
   // Actions
   setCurrentView: (view: ViewType) => void;
   setSelectedTaskId: (id: string | null) => void;
@@ -70,16 +91,16 @@ interface ProjectContextType {
   setFilterStatus: (status: string | null) => void;
   setFilterPriority: (priority: string | null) => void;
   setFilterAssigneeId: (id: string | null) => void;
+  setFilterTagId: (id: string | null) => void;
   setIsIntegrationsOpen: (open: boolean) => void;
   setIsNewAutomationOpen: (open: boolean) => void;
-  setIsAiModalOpen: (open: boolean) => void;
   setSortBy: (sort: { field: SortField; direction: 'asc' | 'desc' } | null) => void;
   setGroupBy: (option: GroupByOption) => void;
   toggleColumnVisibility: (colId: string) => void;
-  
+
   // Tasks CRUD
   addTask: (groupId: string, title?: string) => Task;
-  updateTask: (taskId: string, updates: Partial<Task>) => void;
+  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => void;
   changeTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
   moveTaskToStatus: (taskId: string, newStatus: TaskStatus) => void;
@@ -87,8 +108,42 @@ interface ProjectContextType {
   changeTaskGroup: (taskId: string, newGroupId: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   addSubtask: (taskId: string, title: string) => void;
-  addComment: (taskId: string, text: string, isAi?: boolean, aiModel?: 'Claude' | 'Codex' | 'GitHub' | 'System') => void;
-  
+  addComment: (taskId: string, text: string, isSystem?: boolean) => void;
+  /** Upserts whole task objects (used by billing to mark time entries as invoiced) */
+  saveTasks: (changed: Task[]) => Promise<void>;
+
+  // Archive
+  archiveTask: (taskId: string) => void;
+  unarchiveTask: (taskId: string) => void;
+  archiveCompleted: () => void;
+
+  // Tags
+  addTag: (name: string, color: string) => Tag;
+  updateTag: (tagId: string, updates: Partial<Tag>) => void;
+  deleteTag: (tagId: string) => void;
+  toggleTaskTag: (taskId: string, tagId: string) => void;
+
+  // Recurrence & dependencies
+  setRecurrence: (taskId: string, recurrence: Recurrence | undefined) => void;
+  addBlocker: (taskId: string, blockerId: string) => void;
+  removeBlocker: (taskId: string, blockerId: string) => void;
+
+  // Time tracking
+  runningTimer: { taskId: string; start: string } | null;
+  startTimer: (taskId: string) => void;
+  stopTimer: () => void;
+  addTimeEntry: (taskId: string, entry: { date: string; minutes: number; note?: string }) => void;
+  deleteTimeEntry: (taskId: string, entryId: string) => void;
+
+  // GitHub links
+  addGithubLink: (taskId: string, url: string) => boolean;
+  removeGithubLink: (taskId: string, url: string) => void;
+
+  // Attachments (Supabase Storage)
+  uploadAttachment: (taskId: string, file: File) => Promise<void>;
+  deleteAttachment: (taskId: string, attachment: Attachment) => Promise<void>;
+  getAttachmentUrl: (attachment: Attachment) => Promise<string | null>;
+
   // Custom Columns CRUD
   addCustomColumn: (title: string, type: CustomColumn['type']) => void;
   removeCustomColumn: (columnId: string) => void;
@@ -101,80 +156,69 @@ interface ProjectContextType {
   bulkDeleteTasks: () => void;
   bulkSetStatus: (status: TaskStatus) => void;
 
-  // GitHub PAT & Direct Operations
-  setGithubToken: (token: string) => void;
-  testGithubConnection: (token: string) => Promise<boolean>;
-  createGitHubBranch: (taskId: string, branchName: string) => void;
-  createGitHubPR: (taskId: string, prTitle: string, branchName: string) => void;
-
   // Groups
   toggleGroupCollapse: (groupId: string) => void;
   addGroup: (title: string, color?: string) => void;
   updateGroupTitle: (groupId: string, newTitle: string) => void;
   deleteGroup: (groupId: string) => void;
-  
-  // Automations & Integrations
+
+  // Automations
   toggleAutomation: (workflowId: string) => void;
   addAutomation: (workflow: Omit<AutomationWorkflow, 'id' | 'executionCount' | 'lastRunAt'>) => void;
   deleteAutomation: (workflowId: string) => void;
   triggerManualAutomation: (workflowId: string, targetTaskId?: string) => void;
-  
-  // Live Simulation Triggers
-  simulateGitHubEvent: (eventType: 'PR_MERGED' | 'PR_OPENED' | 'PUSH', taskId?: string) => void;
-  simulateClaudeRefine: (taskId: string) => void;
-  simulateCodexTestGeneration: (taskId: string) => void;
-  
+
   // Toast
   dismissToast: (id: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const INITIAL_CUSTOM_COLUMNS: CustomColumn[] = [
-  { id: 'col-estimate', title: 'Estimativa (h)', type: 'number' },
-];
+const formatTimestamp = (date = new Date()) =>
+  date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const ATTACHMENTS_BUCKET = 'attachments';
+const UNDO_WINDOW_MS = 8000;
+
+const byCreatedDesc = (a: Task, b: Task) => b.createdAt.localeCompare(a.createdAt);
+const byIdDesc = (a: AutomationRunLog, b: AutomationRunLog) => b.id.localeCompare(a.id);
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('softflow_tasks');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
-  });
+  const { user } = useAuth();
+  const currentUser = user!;
+  const enabled = Boolean(user);
 
-  const [groups, setGroups] = useState<Group[]>(() => {
-    const saved = localStorage.getItem('softflow_groups');
-    return saved ? JSON.parse(saved) : INITIAL_GROUPS;
-  });
+  const tasksSync = useSyncedCollection<Task>('tasks', { enabled, sort: byCreatedDesc });
+  const groupsSync = useSyncedCollection<Group>('groups', { enabled, seed: DEFAULT_GROUPS });
+  const automationsSync = useSyncedCollection<AutomationWorkflow>('automations', { enabled, seed: DEFAULT_AUTOMATIONS });
+  const runLogsSync = useSyncedCollection<AutomationRunLog>('run_logs', { enabled, sort: byIdDesc, limit: 100 });
+  const columnsSync = useSyncedCollection<CustomColumn>('custom_columns', { enabled, seed: DEFAULT_CUSTOM_COLUMNS });
+  const tagsSync = useSyncedCollection<Tag>('tags', { enabled });
 
-  const [automations, setAutomations] = useState<AutomationWorkflow[]>(() => {
-    const saved = localStorage.getItem('softflow_automations');
-    return saved ? JSON.parse(saved) : INITIAL_AUTOMATIONS;
-  });
+  const { items: allTasks, setItems: setTasks } = tasksSync;
+  const { items: tags, setItems: setTags } = tagsSync;
+  const tasks = React.useMemo(() => allTasks.filter((t) => !t.archivedAt), [allTasks]);
+  const archivedTasks = React.useMemo(() => allTasks.filter((t) => t.archivedAt), [allTasks]);
+  const { items: groups, setItems: setGroups } = groupsSync;
+  const { items: automations, setItems: setAutomations } = automationsSync;
+  const { items: runLogs, setItems: setRunLogs } = runLogsSync;
+  const { items: customColumns, setItems: setCustomColumns } = columnsSync;
 
-  const [runLogs, setRunLogs] = useState<AutomationRunLog[]>(() => {
-    const saved = localStorage.getItem('softflow_run_logs');
-    return saved ? JSON.parse(saved) : INITIAL_RUN_LOGS;
-  });
+  const isDataLoaded = tasksSync.loaded && groupsSync.loaded && automationsSync.loaded;
+  const syncError =
+    tasksSync.error || groupsSync.error || automationsSync.error || runLogsSync.error || columnsSync.error || tagsSync.error;
 
-  const [customColumns, setCustomColumns] = useState<CustomColumn[]>(() => {
-    const saved = localStorage.getItem('softflow_custom_columns');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOM_COLUMNS;
-  });
+  const [members, setMembers] = useState<Assignee[]>([]);
 
   const [hiddenColumns, setHiddenColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('softflow_hidden_columns');
-    return saved ? JSON.parse(saved) : ['timeline', 'integrations'];
+    return saved ? JSON.parse(saved) : ['timeline'];
   });
 
   const [sortBy, setSortBy] = useState<{ field: SortField; direction: 'asc' | 'desc' } | null>(null);
   const [groupBy, setGroupBy] = useState<GroupByOption>('group');
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
-  const [githubToken, setGithubTokenState] = useState<string>(() => {
-    return localStorage.getItem('softflow_github_token') || 'ghp_live_token_verified_enterprise_99';
-  });
-
-  const [isGithubConnected, setIsGithubConnected] = useState<boolean>(true);
-  const [githubUser, setGithubUser] = useState<string>('lucas-martins (Prevent Senior)');
 
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     const saved = localStorage.getItem('softflow_current_view') as ViewType | null;
@@ -190,11 +234,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [filterPriority, setFilterPriority] = useState<string | null>(null);
   const [filterAssigneeId, setFilterAssigneeId] = useState<string | null>(null);
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
+
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [isNewAutomationOpen, setIsNewAutomationOpen] = useState(false);
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('softflow_theme', theme);
@@ -216,109 +262,42 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [currentView]);
 
   useEffect(() => {
-    localStorage.setItem('softflow_tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem('softflow_groups', JSON.stringify(groups));
-  }, [groups]);
-
-  useEffect(() => {
-    localStorage.setItem('softflow_automations', JSON.stringify(automations));
-  }, [automations]);
-
-  useEffect(() => {
-    localStorage.setItem('softflow_run_logs', JSON.stringify(runLogs));
-  }, [runLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('softflow_custom_columns', JSON.stringify(customColumns));
-  }, [customColumns]);
-
-  useEffect(() => {
     localStorage.setItem('softflow_hidden_columns', JSON.stringify(hiddenColumns));
   }, [hiddenColumns]);
 
-  const showToast = (title: string, description: string, type: ToastMessage['type'] = 'automation') => {
+  // Workspace members = everyone who has signed in
+  useEffect(() => {
+    if (!enabled) return;
+    supabase
+      .from('profiles')
+      .select('id, name, email, avatar_url')
+      .order('name')
+      .then(({ data }) => setMembers((data ?? []).map(toAssignee)));
+  }, [enabled]);
+
+  const showToast = (
+    title: string,
+    description: string,
+    type: ToastMessage['type'] = 'automation',
+    action?: ToastMessage['action']
+  ) => {
     const newToast: ToastMessage = {
       id: 'toast-' + Date.now() + Math.random().toString(36).substr(2, 4),
       title,
       description,
       type,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      action,
     };
     setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
+    window.setTimeout(() => dismissToast(newToast.id), action ? UNDO_WINDOW_MS : 5000);
   };
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const setGithubToken = (token: string) => {
-    setGithubTokenState(token);
-    localStorage.setItem('softflow_github_token', token);
-  };
-
-  const testGithubConnection = async (token: string): Promise<boolean> => {
-    if (!token.trim()) {
-      setIsGithubConnected(false);
-      showToast('GitHub: Token Vazio', 'Insira um Token de Acesso Pessoal (PAT) válido.', 'info');
-      return false;
-    }
-    // Simulate instantaneous verification with GitHub API
-    await new Promise((res) => setTimeout(res, 400));
-    setIsGithubConnected(true);
-    setGithubUser('lucas-martins (Prevent Senior)');
-    setGithubToken(token);
-    showToast('GitHub Conectado', 'Token PAT autenticado com sucesso no repositório.', 'github');
-    return true;
-  };
-
-  const createGitHubBranch = (taskId: string, branchName: string) => {
-    const cleanBranch = branchName.trim() || `feature/task-${taskId.slice(-4)}`;
-    updateTask(taskId, {
-      integrations: {
-        ...tasks.find((t) => t.id === taskId)?.integrations,
-        github: {
-          repo: 'preventsenior/soft-solutions-core',
-          branch: cleanBranch,
-          prStatus: 'draft',
-          commitsCount: 1,
-          checksPassing: true,
-        },
-      },
-    });
-    addComment(taskId, `🌿 Nova branch "${cleanBranch}" criada no repositório GitHub via PAT autenticado.`, true, 'GitHub');
-    showToast('GitHub: Branch Criada', `Branch "${cleanBranch}" vinculada à demanda.`, 'github');
-  };
-
-  const createGitHubPR = (taskId: string, prTitle: string, branchName: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const prNumber = Math.floor(Math.random() * 20) + 50;
-    const cleanTitle = prTitle.trim() || `feat: ${task.title.toLowerCase()}`;
-    const cleanBranch = branchName.trim() || task.integrations.github?.branch || `feature/${task.id}-dev`;
-
-    updateTask(taskId, {
-      status: 'Em Revisão',
-      integrations: {
-        ...task.integrations,
-        github: {
-          repo: 'preventsenior/soft-solutions-core',
-          branch: cleanBranch,
-          prNumber,
-          prTitle: cleanTitle,
-          prStatus: 'open',
-          commitsCount: 3,
-          checksPassing: true,
-        },
-      },
-    });
-
-    addComment(taskId, `🚀 Pull Request #${prNumber} ("${cleanTitle}") aberto com sucesso no GitHub na branch ${cleanBranch}.`, true, 'GitHub');
-    showToast('GitHub: PR Criado', `Pull Request #${prNumber} aberto. Demanda movida para "Em Revisão".`, 'github');
-  };
+  // --- Preferences & selection ---
 
   const toggleColumnVisibility = (colId: string) => {
     setHiddenColumns((prev) =>
@@ -351,12 +330,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...t.customFields,
             [columnId]: value,
           },
+          updatedAt: new Date().toISOString(),
         };
       })
     );
   };
 
-  // Multi-selection
   const toggleTaskSelection = (taskId: string) => {
     setSelectedTaskIds((prev) =>
       prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
@@ -379,187 +358,426 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const bulkDeleteTasks = () => {
     if (selectedTaskIds.length === 0) return;
-    setTasks((prev) => prev.filter((t) => !selectedTaskIds.includes(t.id)));
-    showToast('Exclusão em Lote', `${selectedTaskIds.length} tarefas excluídas.`, 'info');
+    removeTasksWithUndo(selectedTaskIds);
     clearTaskSelection();
   };
 
   const bulkSetStatus = (status: TaskStatus) => {
     if (selectedTaskIds.length === 0) return;
+    const now = new Date().toISOString();
     setTasks((prev) =>
-      prev.map((t) => (selectedTaskIds.includes(t.id) ? { ...t, status } : t))
+      prev.map((t) => (selectedTaskIds.includes(t.id) ? { ...t, status, updatedAt: now } : t))
     );
     showToast('Status Atualizado', `${selectedTaskIds.length} tarefas alteradas para "${status}".`, 'info');
     clearTaskSelection();
   };
 
-  const recordRunLog = (
-    workflowId: string,
-    workflowName: string,
-    taskId: string,
-    taskTitle: string,
-    details: string,
-    integrationType: 'Claude' | 'Codex' | 'GitHub' | 'Workflow'
-  ) => {
+  // --- Automations (client-side events) ---
+
+  const recordRunLog = (workflow: AutomationWorkflow, task: Task, details: string) => {
+    const now = new Date();
     const newLog: AutomationRunLog = {
-      id: 'log-' + Date.now(),
-      workflowId,
-      workflowName,
-      taskId,
-      taskTitle,
-      timestamp: 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      id: `log-${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      taskId: task.id,
+      taskTitle: task.title,
+      timestamp: formatTimestamp(now),
       status: 'success',
       details,
-      integrationType,
     };
     setRunLogs((prev) => [newLog, ...prev]);
 
     setAutomations((prev) =>
       prev.map((a) =>
-        a.id === workflowId
-          ? {
-              ...a,
-              executionCount: a.executionCount + 1,
-              lastRunAt: 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            }
+        a.id === workflow.id
+          ? { ...a, executionCount: a.executionCount + 1, lastRunAt: formatTimestamp(now) }
           : a
       )
     );
   };
 
+  /** Applies one automation's action to a task and logs the run. */
+  const runAutomationAction = (auto: AutomationWorkflow, task: Task) => {
+    switch (auto.action.type) {
+      case 'NOTIFY_TEAM':
+        addComment(task.id, `Automação "${auto.name}": demanda sinalizada.`, true);
+        recordRunLog(auto, task, 'Alerta registrado na demanda.');
+        showToast('Alerta de Fluxo', `Demanda "${task.title}" escalada para a equipe.`, 'info');
+        break;
+      case 'SET_STATUS':
+      case 'MOVE_TO_GROUP': {
+        const updates: Partial<Task> = {};
+        if (auto.action.targetStatus) updates.status = auto.action.targetStatus;
+        if (auto.action.targetGroupId && groups.some((g) => g.id === auto.action.targetGroupId)) {
+          updates.groupId = auto.action.targetGroupId;
+        }
+        updateTask(task.id, updates);
+        recordRunLog(auto, task, `Ação "${auto.action.label}" aplicada.`);
+        showToast('Fluxo Executado', `Automação "${auto.name}" aplicada a "${task.title}".`, 'automation');
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
   const executeAutomationsForEvent = (
     triggerType: 'STATUS_CHANGE' | 'TASK_CREATED' | 'PRIORITY_SET_CRITICAL',
-    task: Task,
-    previousState?: Partial<Task>
+    task: Task
   ) => {
     automations.forEach((auto) => {
-      if (!auto.enabled) return;
-
-      if (auto.trigger.type === triggerType) {
-        let matches = true;
-
-        if (triggerType === 'STATUS_CHANGE' && auto.trigger.targetStatus) {
-          if (task.status !== auto.trigger.targetStatus) {
-            matches = false;
-          }
-        }
-
-        if (auto.condition) {
-          if (auto.condition.field === 'groupId' && task.groupId !== auto.condition.value) {
-            matches = false;
-          }
-        }
-
-        if (matches) {
-          if (auto.action.type === 'CODEX_GENERATE_TESTS') {
-            simulateCodexTestGeneration(task.id, auto);
-          } else if (auto.action.type === 'CLAUDE_REFINE') {
-            simulateClaudeRefine(task.id, auto);
-          } else if (auto.action.type === 'GITHUB_CREATE_BRANCH') {
-            const branchName = `feature/${task.id}-${task.title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 20)}`;
-            updateTask(task.id, {
-              integrations: {
-                ...task.integrations,
-                github: {
-                  repo: task.integrations.github?.repo || 'preventsenior/soft-solutions-core',
-                  branch: branchName,
-                  prStatus: 'draft',
-                  commitsCount: 1,
-                  checksPassing: true,
-                },
-              },
-            });
-            recordRunLog(
-              auto.id,
-              auto.name,
-              task.id,
-              task.title,
-              `Branch "${branchName}" criada no GitHub via automação.`,
-              'GitHub'
-            );
-            showToast('GitHub: Branch Criada', `Branch "${branchName}" gerada para a demanda "${task.title}".`, 'github');
-          } else if (auto.action.type === 'NOTIFY_TEAM') {
-            addComment(task.id, `🚨 Alerta de Escalada: Demanda marcada com prioridade crítica ou bloqueio. Equipe notificada.`, true, 'System');
-            recordRunLog(
-              auto.id,
-              auto.name,
-              task.id,
-              task.title,
-              `Notificação de bloqueio enviada à equipe de engenharia.`,
-              'Workflow'
-            );
-            showToast('Alerta de Fluxo', `Demanda "${task.title}" escalada para o time de suporte.`, 'info');
-          }
-        }
-      }
+      if (!auto.enabled || auto.trigger.type !== triggerType) return;
+      if (triggerType === 'STATUS_CHANGE' && auto.trigger.targetStatus && task.status !== auto.trigger.targetStatus) return;
+      if (auto.condition?.field === 'groupId' && task.groupId !== auto.condition.value) return;
+      runAutomationAction(auto, task);
     });
   };
 
+  // --- Tasks ---
+
   const addTask = (groupId: string, title?: string): Task => {
+    const now = new Date().toISOString();
     const newTask: Task = {
       id: 'task-' + Date.now(),
       groupId,
       title: title || 'Nova Demanda',
-      description: 'Adicione detalhes e critérios de aceite para esta demanda.',
+      description: '',
       status: 'A Fazer',
       priority: 'Média',
-      assignee: CURRENT_USER,
-      dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+      assignee: currentUser,
+      dueDate: localDate(3),
       timeline: {
-        start: new Date().toISOString().split('T')[0],
-        end: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+        start: localDate(0),
+        end: localDate(3),
       },
       subtasks: [],
-      comments: [
-        {
-          id: 'c-' + Date.now(),
-          author: 'Sistema',
-          timestamp: 'Agora',
-          text: 'Demanda criada.',
-        },
-      ],
-      integrations: {
-        github: {
-          repo: 'preventsenior/soft-solutions-core',
-        },
-      },
-      customFields: {
-        'col-estimate': 4,
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      comments: [],
+      customFields: {},
+      createdAt: now,
+      updatedAt: now,
     };
 
-    setTasks((prev) => [newTask, ...prev]);
-
-    setTimeout(() => {
-      executeAutomationsForEvent('TASK_CREATED', newTask);
-    }, 200);
+    void setTasks((prev) => [newTask, ...prev]).then(() => executeAutomationsForEvent('TASK_CREATED', newTask));
 
     return newTask;
   };
 
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
+  const updateTask = (taskId: string, updates: Partial<Task>) =>
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t))
     );
+
+  /** Upserts whole task objects by id. */
+  const saveTasks = (changed: Task[]) => {
+    const byId = new Map(changed.map((t) => [t.id, t]));
+    return setTasks((prev) => prev.map((t) => byId.get(t.id) ?? t));
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (selectedTaskId === taskId) {
-      setSelectedTaskId(null);
+  // Attachment files of deleted tasks are only removed once the undo window has passed
+  const pendingDeletions = useRef(new Map<string, number>());
+
+  /** Deletes tasks right away, with an "Desfazer" toast that puts them back. */
+  const removeTasksWithUndo = (ids: string[]) => {
+    const removed = allTasks.filter((t) => ids.includes(t.id));
+    if (removed.length === 0) return;
+    void setTasks((prev) => prev.filter((t) => !ids.includes(t.id)));
+    if (selectedTaskId && ids.includes(selectedTaskId)) setSelectedTaskId(null);
+
+    const key = ids.join(',');
+    const files = removed.flatMap((t) => (t.attachments ?? []).map((a) => a.path));
+    if (files.length > 0) {
+      const timer = window.setTimeout(() => {
+        pendingDeletions.current.delete(key);
+        void supabase.storage.from(ATTACHMENTS_BUCKET).remove(files);
+      }, UNDO_WINDOW_MS);
+      pendingDeletions.current.set(key, timer);
     }
-    showToast('Demanda Removida', 'A demanda foi excluída com sucesso.', 'info');
+
+    showToast(
+      removed.length === 1 ? 'Demanda excluída' : `${removed.length} demandas excluídas`,
+      removed.length === 1 ? `"${removed[0].title}" foi excluída.` : 'As demandas selecionadas foram excluídas.',
+      'info',
+      {
+        label: 'Desfazer',
+        onClick: () => {
+          window.clearTimeout(pendingDeletions.current.get(key));
+          pendingDeletions.current.delete(key);
+          void setTasks((prev) => [...removed, ...prev.filter((t) => !ids.includes(t.id))]);
+        },
+      }
+    );
+  };
+
+  const deleteTask = (taskId: string) => removeTasksWithUndo([taskId]);
+
+  const openBlockers = (task: Task) =>
+    (task.blockedBy ?? [])
+      .map((id) => allTasks.find((t) => t.id === id))
+      .filter((t): t is Task => Boolean(t) && t!.status !== 'Pronto');
+
+  const applyStatusChange = (task: Task, newStatus: TaskStatus) => {
+    const updated = { ...task, status: newStatus, updatedAt: new Date().toISOString() };
+
+    // Completing a recurring task schedules the next one; the recurrence moves to the new task
+    let next: Task | null = null;
+    if (newStatus === 'Pronto' && task.recurrence) {
+      next = nextOccurrence(task, 'task-' + Date.now());
+      updated.recurrence = undefined;
+    }
+
+    void setTasks((prev) => {
+      const list = prev.map((t) => (t.id === task.id ? updated : t));
+      return next ? [next, ...list] : list;
+    }).then(() => executeAutomationsForEvent('STATUS_CHANGE', updated));
+
+    if (next) showToast('Próxima ocorrência criada', `"${next.title}" agendada para ${next.dueDate.split('-').reverse().join('/')}.`, 'info');
   };
 
   const changeTaskStatus = (taskId: string, newStatus: TaskStatus) => {
-    const task = tasks.find((t) => t.id === taskId);
+    const task = allTasks.find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
-    const updatedTask = { ...task, status: newStatus };
-    updateTask(taskId, { status: newStatus });
-    executeAutomationsForEvent('STATUS_CHANGE', updatedTask);
+    const blockers = newStatus === 'Pronto' ? openBlockers(task) : [];
+    if (blockers.length > 0) {
+      setPendingStatusChange({ taskId, status: newStatus, blockers });
+      return;
+    }
+    applyStatusChange(task, newStatus);
+  };
+
+  const confirmPendingStatusChange = () => {
+    if (!pendingStatusChange) return;
+    const task = allTasks.find((t) => t.id === pendingStatusChange.taskId);
+    if (task) applyStatusChange(task, pendingStatusChange.status);
+    setPendingStatusChange(null);
+  };
+
+  const cancelPendingStatusChange = () => setPendingStatusChange(null);
+
+  // --- Archive ---
+
+  const archiveTask = (taskId: string) => {
+    void updateTask(taskId, { archivedAt: new Date().toISOString() });
+    if (selectedTaskId === taskId) setSelectedTaskId(null);
+    showToast('Demanda arquivada', 'Ela fica disponível na tela Arquivo.', 'info', {
+      label: 'Desfazer',
+      onClick: () => void updateTask(taskId, { archivedAt: undefined }),
+    });
+  };
+
+  const unarchiveTask = (taskId: string) => {
+    void updateTask(taskId, { archivedAt: undefined });
+    showToast('Demanda restaurada', 'A demanda voltou para o quadro.', 'info');
+  };
+
+  const archiveCompleted = () => {
+    const done = tasks.filter((t) => t.status === 'Pronto').map((t) => t.id);
+    if (done.length === 0) {
+      showToast('Nada para arquivar', 'Não há demandas concluídas no quadro.', 'info');
+      return;
+    }
+    const now = new Date().toISOString();
+    void setTasks((prev) => prev.map((t) => (done.includes(t.id) ? { ...t, archivedAt: now, updatedAt: now } : t)));
+    showToast(`${done.length} demandas arquivadas`, 'As concluídas saíram do quadro.', 'info', {
+      label: 'Desfazer',
+      onClick: () =>
+        void setTasks((prev) => prev.map((t) => (done.includes(t.id) ? { ...t, archivedAt: undefined } : t))),
+    });
+  };
+
+  // --- Tags ---
+
+  const addTag = (name: string, color: string): Tag => {
+    const tag: Tag = { id: 'tag-' + Date.now(), name: name.trim(), color };
+    void setTags((prev) => [...prev, tag]);
+    return tag;
+  };
+
+  const updateTag = (tagId: string, updates: Partial<Tag>) =>
+    void setTags((prev) => prev.map((t) => (t.id === tagId ? { ...t, ...updates } : t)));
+
+  const deleteTag = (tagId: string) => {
+    void setTags((prev) => prev.filter((t) => t.id !== tagId));
+    void setTasks((prev) =>
+      prev.map((t) => (t.tags?.includes(tagId) ? { ...t, tags: t.tags.filter((id) => id !== tagId) } : t))
+    );
+    if (filterTagId === tagId) setFilterTagId(null);
+  };
+
+  const toggleTaskTag = (taskId: string, tagId: string) =>
+    void setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        const current = t.tags ?? [];
+        const next = current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId];
+        return { ...t, tags: next, updatedAt: new Date().toISOString() };
+      })
+    );
+
+  // --- Recurrence & dependencies ---
+
+  const setRecurrence = (taskId: string, recurrence: Recurrence | undefined) =>
+    void updateTask(taskId, { recurrence });
+
+  /** Would making `taskId` wait on `blockerId` create a cycle? */
+  const createsCycle = (taskId: string, blockerId: string) => {
+    const seen = new Set<string>();
+    const stack = [blockerId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (id === taskId) return true;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      stack.push(...(allTasks.find((t) => t.id === id)?.blockedBy ?? []));
+    }
+    return false;
+  };
+
+  const addBlocker = (taskId: string, blockerId: string) => {
+    if (taskId === blockerId) return;
+    if (createsCycle(taskId, blockerId)) {
+      showToast('Dependência circular', 'Essa dependência faria as duas demandas esperarem uma pela outra.', 'info');
+      return;
+    }
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task || task.blockedBy?.includes(blockerId)) return;
+    void updateTask(taskId, { blockedBy: [...(task.blockedBy ?? []), blockerId] });
+  };
+
+  const removeBlocker = (taskId: string, blockerId: string) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    void updateTask(taskId, { blockedBy: (task.blockedBy ?? []).filter((id) => id !== blockerId) });
+  };
+
+  // --- Time tracking ---
+
+  const running = findRunningEntry(allTasks);
+  const runningTimer = running ? { taskId: running.task.id, start: running.entry.start } : null;
+
+  /** Closes any running entry; returns the updated list */
+  const withTimerStopped = (list: Task[], now: string) =>
+    list.map((t) =>
+      t.timeEntries?.some((e) => e.end === null)
+        ? { ...t, timeEntries: t.timeEntries.map((e) => (e.end === null ? { ...e, end: now } : e)), updatedAt: now }
+        : t
+    );
+
+  // Starting a timer stops the previous one in the same update, so only one runs at a time
+  const startTimer = (taskId: string) => {
+    const now = new Date().toISOString();
+    void setTasks((prev) =>
+      withTimerStopped(prev, now).map((t) =>
+        t.id === taskId
+          ? { ...t, timeEntries: [...(t.timeEntries ?? []), { id: 'time-' + Date.now(), start: now, end: null }], updatedAt: now }
+          : t
+      )
+    );
+  };
+
+  const stopTimer = () => void setTasks((prev) => withTimerStopped(prev, new Date().toISOString()));
+
+  const addTimeEntry = (taskId: string, entry: { date: string; minutes: number; note?: string }) => {
+    // Manual entries start at noon of the chosen day so the date never shifts across timezones
+    const [y, m, d] = entry.date.split('-').map(Number);
+    const start = new Date(y, m - 1, d, 12, 0, 0);
+    const end = new Date(start.getTime() + entry.minutes * 60000);
+    void setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              timeEntries: [
+                ...(t.timeEntries ?? []),
+                { id: 'time-' + Date.now(), start: start.toISOString(), end: end.toISOString(), note: entry.note?.trim() || undefined },
+              ],
+              updatedAt: new Date().toISOString(),
+            }
+          : t
+      )
+    );
+  };
+
+  const deleteTimeEntry = (taskId: string, entryId: string) => {
+    const entry = allTasks.find((t) => t.id === taskId)?.timeEntries?.find((e) => e.id === entryId);
+    if (entry?.invoiceId) {
+      showToast('Lançamento faturado', 'Cancele a fatura antes de excluir este lançamento.', 'info');
+      return;
+    }
+    void setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, timeEntries: (t.timeEntries ?? []).filter((e) => e.id !== entryId) } : t
+      )
+    );
+  };
+
+  // --- GitHub links ---
+
+  const addGithubLink = (taskId: string, url: string) => {
+    const parsed = parseGithubLink(url);
+    if (!parsed) {
+      showToast('Link inválido', 'Use o link de um PR ou issue do GitHub.', 'info');
+      return false;
+    }
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task || task.githubLinks?.includes(parsed.url)) return true;
+    void updateTask(taskId, { githubLinks: [...(task.githubLinks ?? []), parsed.url] });
+    return true;
+  };
+
+  const removeGithubLink = (taskId: string, url: string) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    void updateTask(taskId, { githubLinks: (task.githubLinks ?? []).filter((u) => u !== url) });
+  };
+
+  // --- Attachments ---
+
+  const uploadAttachment = async (taskId: string, file: File) => {
+    const safeName = file.name.normalize('NFD').replace(/[^\w.-]+/g, '_');
+    const path = `${taskId}/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type });
+    if (error) {
+      showToast('Falha no envio', error.message, 'info');
+      return;
+    }
+    const attachment: Attachment = {
+      id: 'att-' + Date.now(),
+      name: file.name,
+      path,
+      size: file.size,
+      type: file.type,
+      uploadedAt: new Date().toISOString(),
+    };
+    await setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, attachments: [...(t.attachments ?? []), attachment] } : t))
+    );
+  };
+
+  const deleteAttachment = async (taskId: string, attachment: Attachment) => {
+    const { error } = await supabase.storage.from(ATTACHMENTS_BUCKET).remove([attachment.path]);
+    if (error) {
+      showToast('Falha ao excluir anexo', error.message, 'info');
+      return;
+    }
+    await setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, attachments: (t.attachments ?? []).filter((a) => a.id !== attachment.id) } : t
+      )
+    );
+  };
+
+  /** Short-lived signed URL, since the bucket is private */
+  const getAttachmentUrl = async (attachment: Attachment) => {
+    const { data, error } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .createSignedUrl(attachment.path, 60, { download: attachment.name });
+    if (error) {
+      showToast('Falha ao abrir anexo', error.message, 'info');
+      return null;
+    }
+    return data.signedUrl;
   };
 
   const moveTaskToStatus = (taskId: string, newStatus: TaskStatus) => {
@@ -570,12 +788,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.priority === newPriority) return;
 
-    const updatedTask = { ...task, priority: newPriority };
-    updateTask(taskId, { priority: newPriority });
-
-    if (newPriority === 'Crítica') {
-      executeAutomationsForEvent('PRIORITY_SET_CRITICAL', updatedTask);
-    }
+    void updateTask(taskId, { priority: newPriority }).then(() => {
+      if (newPriority === 'Crítica') {
+        executeAutomationsForEvent('PRIORITY_SET_CRITICAL', { ...task, priority: newPriority });
+      }
+    });
   };
 
   const changeTaskGroup = (taskId: string, newGroupId: string) => {
@@ -589,6 +806,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           ...t,
           subtasks: t.subtasks.map((st) => (st.id === subtaskId ? { ...st, completed: !st.completed } : st)),
+          updatedAt: new Date().toISOString(),
         };
       })
     );
@@ -602,33 +820,31 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           ...t,
           subtasks: [...t.subtasks, { id: 'sub-' + Date.now(), title, completed: false }],
+          updatedAt: new Date().toISOString(),
         };
       })
     );
   };
 
-  const addComment = (
-    taskId: string,
-    text: string,
-    isAi: boolean = false,
-    aiModel: 'Claude' | 'Codex' | 'GitHub' | 'System' = 'System'
-  ) => {
+  const addComment = (taskId: string, text: string, isSystem: boolean = false) => {
     if (!text.trim()) return;
     const newComment = {
       id: 'comm-' + Date.now(),
-      author: isAi ? aiModel : CURRENT_USER.name,
-      avatar: isAi ? undefined : CURRENT_USER.avatar,
+      author: isSystem ? 'SoftFlow' : currentUser.name,
+      avatar: isSystem ? undefined : currentUser.avatar,
       text,
-      timestamp: 'Hoje às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      isAi,
-      aiModel,
+      timestamp: formatTimestamp(),
+      isSystem,
     };
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, comments: [...t.comments, newComment] } : t))
+      prev.map((t) =>
+        t.id === taskId ? { ...t, comments: [...t.comments, newComment], updatedAt: new Date().toISOString() } : t
+      )
     );
   };
 
-  // Group operations
+  // --- Groups ---
+
   const toggleGroupCollapse = (groupId: string) => {
     setGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g))
@@ -654,29 +870,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteGroup = (groupId: string) => {
-    setGroups((prev) => prev.filter((g) => g.id !== groupId));
     const remaining = groups.filter((g) => g.id !== groupId);
     if (remaining.length > 0) {
       setTasks((prev) =>
         prev.map((t) => (t.groupId === groupId ? { ...t, groupId: remaining[0].id } : t))
       );
     }
+    setGroups(remaining);
     showToast('Grupo Removido', 'O grupo e suas associações foram atualizados.', 'info');
   };
 
-  // Automation operations
+  // --- Automation management ---
+
   const toggleAutomation = (workflowId: string) => {
-    setAutomations((prev) =>
-      prev.map((a) => {
-        if (a.id !== workflowId) return a;
-        const nextState = !a.enabled;
-        showToast(
-          nextState ? 'Fluxo Ativado' : 'Fluxo Pausado',
-          `O fluxo "${a.name}" foi ${nextState ? 'ativado' : 'pausado'}.`,
-          'automation'
-        );
-        return { ...a, enabled: nextState };
-      })
+    const target = automations.find((a) => a.id === workflowId);
+    if (!target) return;
+    const nextState = !target.enabled;
+    setAutomations((prev) => prev.map((a) => (a.id === workflowId ? { ...a, enabled: nextState } : a)));
+    showToast(
+      nextState ? 'Fluxo Ativado' : 'Fluxo Pausado',
+      `O fluxo "${target.name}" foi ${nextState ? 'ativado' : 'pausado'}.`,
+      'automation'
     );
   };
 
@@ -696,237 +910,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast('Fluxo Excluído', 'A automação foi removida.', 'info');
   };
 
-  // Instant execution templates
-  const simulateCodexTestGeneration = (taskId: string, workflow?: AutomationWorkflow) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const wf = workflow || automations.find((a) => a.id === 'auto-2') || automations[0];
-
-    const generatedCode = `// Generated by Codex Engine - Vitest Suite for ${task.title}
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeTaskFlow } from '@/services/flowEngine';
-
-describe('${task.title}', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should initialize and execute task action with valid payload', async () => {
-    const result = await executeTaskFlow('${task.id}', { status: '${task.status}' });
-    expect(result.success).toBe(true);
-    expect(result.taskId).toBe('${task.id}');
-  });
-
-  it('should handle boundary exceptions and dispatch audit rollback', async () => {
-    await expect(executeTaskFlow('', null)).rejects.toThrow();
-  });
-});`;
-
-    const reviewSummary = `Qualidade 100%: Tipagem estrita TypeScript, testes unitários assíncronos e proteção contra exceções não tratadas.`;
-
-    updateTask(taskId, {
-      integrations: {
-        ...task.integrations,
-        codex: {
-          lastRunAt: new Date().toISOString(),
-          codeSnippet: `export const executeTaskFlow = async (id: string, opts: any) => {\n  if (!id) throw new Error('Task ID missing');\n  return { success: true, taskId: id, timestamp: Date.now() };\n};`,
-          generatedTests: generatedCode,
-          reviewScore: 98,
-          reviewSummary,
-          testsPassing: true,
-        },
-      },
-      subtasks:
-        task.subtasks.length > 0
-          ? task.subtasks
-          : [
-              { id: 'st-codex-1', title: 'Testes unitários aprovados (Codex)', completed: true },
-              { id: 'st-codex-2', title: 'Validação de tipos e cobertura', completed: true },
-            ],
-    });
-
-    addComment(
-      taskId,
-      `⚡ Codex gerou testes unitários com sucesso (Score 98/100). Cobertura de cenários garantida.`,
-      true,
-      'Codex'
-    );
-
-    recordRunLog(
-      wf.id,
-      wf.name,
-      task.id,
-      task.title,
-      `Codex gerou suite de testes completa e realizou code review estático na demanda "${task.title}".`,
-      'Codex'
-    );
-
-    showToast('Codex: Testes Gerados', `Suite de testes gerada com 98% de score para "${task.title}".`, 'codex');
-  };
-
-  const simulateClaudeRefine = (taskId: string, workflow?: AutomationWorkflow) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const wf = workflow || automations.find((a) => a.id === 'auto-3') || automations[0];
-
-    const userStory = `Como stakeholder de engenharia, preciso de "${task.title}" para garantir máxima produtividade no fluxo de entrega contínua com zero retrabalho.`;
-    const criteria = [
-      `Tempo de execução inferior a 250ms com feedback visual`,
-      `Tratar estados de falha de rede com retry idempotente`,
-      `Validar permissões RBAC do usuário solicitante`,
-      `Registrar evento de auditoria no log central de automações`,
-    ];
-
-    updateTask(taskId, {
-      integrations: {
-        ...task.integrations,
-        claude: {
-          refinedAt: new Date().toISOString(),
-          userStory,
-          acceptanceCriteria: criteria,
-          complexityScore: 'M',
-          estimatedHours: 6,
-          summary: `Refinamento estruturado gerado pelo Claude 3.5 Sonnet. 4 critérios de aceite identificados.`,
-        },
-      },
-      subtasks: [
-        ...task.subtasks,
-        { id: 'claude-1', title: 'Implementar validação de permissões RBAC', completed: false },
-        { id: 'claude-2', title: 'Adicionar feedback visual e telemetria', completed: false },
-      ],
-    });
-
-    addComment(
-      taskId,
-      `🤖 Claude refinou esta demanda: Adicionados critérios de aceite detalhados e estimativa de 6h (Complexidade M).`,
-      true,
-      'Claude'
-    );
-
-    recordRunLog(
-      wf.id,
-      wf.name,
-      task.id,
-      task.title,
-      `Claude realizou decomposição da demanda em 4 critérios de aceite e gerou 2 sub-tarefas.`,
-      'Claude'
-    );
-
-    showToast('Claude: Demanda Refinada', `Critérios de aceite e sub-tarefas gerados para "${task.title}".`, 'claude');
-  };
-
-  const simulateGitHubEvent = (eventType: 'PR_MERGED' | 'PR_OPENED' | 'PUSH', targetTaskId?: string) => {
-    const task = targetTaskId
-      ? tasks.find((t) => t.id === targetTaskId)
-      : tasks.find((t) => t.integrations.github?.prStatus === 'open') || tasks[0];
-
-    if (!task) return;
-
-    if (eventType === 'PR_MERGED') {
-      const prNumber = task.integrations.github?.prNumber || 42;
-      const doneGroup = groups.find((g) => g.id === 'group-concluido') || groups[groups.length - 1];
-
-      updateTask(task.id, {
-        status: 'Pronto',
-        groupId: doneGroup.id,
-        integrations: {
-          ...task.integrations,
-          github: {
-            ...task.integrations.github,
-            repo: task.integrations.github?.repo || 'preventsenior/soft-solutions-core',
-            prStatus: 'merged',
-            prNumber,
-            checksPassing: true,
-          },
-        },
-      });
-
-      addComment(
-        task.id,
-        `✓ Webhook GitHub: Pull Request #${prNumber} foi mesclado na branch main com sucesso!`,
-        true,
-        'GitHub'
-      );
-
-      const auto = automations.find((a) => a.trigger.type === 'GITHUB_PR_MERGED') || automations[0];
-      recordRunLog(
-        auto.id,
-        auto.name,
-        task.id,
-        task.title,
-        `Webhook GitHub: Evento "pull_request.closed [merged=true]" -> Demanda movida para "${doneGroup.title}" com status "Pronto".`,
-        'GitHub'
-      );
-
-      showToast(
-        'GitHub: PR Mesclado',
-        `PR #${prNumber} mesclado com sucesso! Demanda "${task.title}" marcada como Pronto.`,
-        'github'
-      );
-    } else if (eventType === 'PR_OPENED') {
-      const prNumber = Math.floor(Math.random() * 20) + 50;
-      updateTask(task.id, {
-        status: 'Em Revisão',
-        integrations: {
-          ...task.integrations,
-          github: {
-            ...task.integrations.github,
-            repo: 'preventsenior/soft-solutions-core',
-            prStatus: 'open',
-            prNumber,
-            prTitle: `feat: implementation of ${task.title.toLowerCase()}`,
-            checksPassing: true,
-          },
-        },
-      });
-
-      addComment(
-        task.id,
-        `🚀 GitHub Webhook: Novo Pull Request #${prNumber} aberto. Status atualizado para "Em Revisão".`,
-        true,
-        'GitHub'
-      );
-
-      showToast(
-        'GitHub: PR Aberto',
-        `Pull Request #${prNumber} aberto. Demanda movida para "Em Revisão".`,
-        'github'
-      );
-    }
-  };
-
+  /** Runs an automation's action right now on a task (the most recent one if none is given). */
   const triggerManualAutomation = (workflowId: string, targetTaskId?: string) => {
     const wf = automations.find((a) => a.id === workflowId);
     if (!wf) return;
 
-    const task = targetTaskId ? tasks.find((t) => t.id === targetTaskId) : tasks[0];
-    if (!task) return;
-
-    if (wf.trigger.type === 'GITHUB_PR_MERGED') {
-      simulateGitHubEvent('PR_MERGED', task.id);
-    } else if (wf.action.type === 'CODEX_GENERATE_TESTS') {
-      simulateCodexTestGeneration(task.id, wf);
-    } else if (wf.action.type === 'CLAUDE_REFINE') {
-      simulateClaudeRefine(task.id, wf);
-    } else {
-      if (wf.action.targetStatus) {
-        changeTaskStatus(task.id, wf.action.targetStatus);
-      }
-      if (wf.action.targetGroupId) {
-        changeTaskGroup(task.id, wf.action.targetGroupId);
-      }
-      recordRunLog(
-        wf.id,
-        wf.name,
-        task.id,
-        task.title,
-        `Fluxo manual disparado: Ação "${wf.action.label}" aplicada à demanda.`,
-        'Workflow'
-      );
-      showToast('Fluxo Executado', `Automação "${wf.name}" executada com sucesso!`, 'automation');
+    const task = targetTaskId ? allTasks.find((t) => t.id === targetTaskId) : tasks[0];
+    if (!task) {
+      showToast('Nenhuma demanda', 'Crie uma demanda para executar a automação.', 'info');
+      return;
     }
+    runAutomationAction(wf, task);
   };
 
   return (
@@ -937,36 +931,45 @@ describe('${task.title}', () => {
         isMobileSidebarOpen,
         setIsMobileSidebarOpen,
         tasks,
+        archivedTasks,
+        allTasks,
+        tags,
         groups,
         automations,
         runLogs,
+        isDataLoaded,
+        syncError,
+        currentUser,
+        members,
         currentView,
         selectedTaskId,
         searchQuery,
         filterStatus,
         filterPriority,
         filterAssigneeId,
+        filterTagId,
         toasts,
+        isCommandPaletteOpen,
+        setIsCommandPaletteOpen,
+        pendingStatusChange,
+        confirmPendingStatusChange,
+        cancelPendingStatusChange,
         isIntegrationsOpen,
         isNewAutomationOpen,
-        isAiModalOpen,
         customColumns,
         hiddenColumns,
         sortBy,
         groupBy,
         selectedTaskIds,
-        githubToken,
-        isGithubConnected,
-        githubUser,
         setCurrentView,
         setSelectedTaskId,
         setSearchQuery,
         setFilterStatus,
         setFilterPriority,
         setFilterAssigneeId,
+        setFilterTagId,
         setIsIntegrationsOpen,
         setIsNewAutomationOpen,
-        setIsAiModalOpen,
         setSortBy,
         setGroupBy,
         toggleColumnVisibility,
@@ -980,6 +983,27 @@ describe('${task.title}', () => {
         toggleSubtask,
         addSubtask,
         addComment,
+        saveTasks,
+        archiveTask,
+        unarchiveTask,
+        archiveCompleted,
+        addTag,
+        updateTag,
+        deleteTag,
+        toggleTaskTag,
+        setRecurrence,
+        addBlocker,
+        removeBlocker,
+        runningTimer,
+        startTimer,
+        stopTimer,
+        addTimeEntry,
+        deleteTimeEntry,
+        addGithubLink,
+        removeGithubLink,
+        uploadAttachment,
+        deleteAttachment,
+        getAttachmentUrl,
         addCustomColumn,
         removeCustomColumn,
         updateCustomFieldValue,
@@ -988,10 +1012,6 @@ describe('${task.title}', () => {
         clearTaskSelection,
         bulkDeleteTasks,
         bulkSetStatus,
-        setGithubToken,
-        testGithubConnection,
-        createGitHubBranch,
-        createGitHubPR,
         toggleGroupCollapse,
         addGroup,
         updateGroupTitle,
@@ -1000,9 +1020,6 @@ describe('${task.title}', () => {
         addAutomation,
         deleteAutomation,
         triggerManualAutomation,
-        simulateGitHubEvent,
-        simulateClaudeRefine,
-        simulateCodexTestGeneration,
         dismissToast,
       }}
     >

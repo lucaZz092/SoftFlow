@@ -10,8 +10,13 @@ import {
   Sun,
   Moon,
   X,
+  LogOut,
+  Github,
+  Receipt,
+  Archive,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 import { ViewType } from '../types';
 
 const NAV_ITEMS: { id: ViewType; label: string; icon: React.ElementType }[] = [
@@ -19,8 +24,11 @@ const NAV_ITEMS: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: 'table', label: 'Demandas', icon: LayoutList },
   { id: 'kanban', label: 'Kanban', icon: Layers },
   { id: 'timeline', label: 'Cronograma', icon: Calendar },
+  { id: 'github', label: 'GitHub', icon: Github },
+  { id: 'billing', label: 'Faturamento', icon: Receipt },
   { id: 'automations', label: 'Automações', icon: Workflow },
   { id: 'metrics', label: 'Métricas', icon: BarChart3 },
+  { id: 'archive', label: 'Arquivo', icon: Archive },
 ];
 
 export const NavigationSidebar: React.FC = () => {
@@ -32,7 +40,9 @@ export const NavigationSidebar: React.FC = () => {
     setIsMobileSidebarOpen,
     theme,
     toggleTheme,
+    currentUser,
   } = useProject();
+  const { signOut } = useAuth();
 
   const handleNavClick = (view: ViewType) => {
     setCurrentView(view);
@@ -107,11 +117,24 @@ export const NavigationSidebar: React.FC = () => {
           )}
           <span>{theme === 'dark' ? 'Modo claro' : 'Modo escuro'}</span>
         </button>
-        <div className="flex items-center gap-2.5 px-2.5 pt-3">
-          <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-[10px] font-semibold flex items-center justify-center">
-            LM
-          </span>
-          <span className="text-[13px] text-[var(--text-secondary)] truncate">Lucas Martins</span>
+        <div className="flex items-center gap-2.5 pl-2.5 pt-3">
+          {currentUser.avatar ? (
+            <img src={currentUser.avatar} alt="" className="w-6 h-6 rounded-full shrink-0" />
+          ) : (
+            <span className="w-6 h-6 rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-[10px] font-semibold flex items-center justify-center shrink-0">
+              {currentUser.initials}
+            </span>
+          )}
+          <span className="flex-1 min-w-0 text-[13px] text-[var(--text-secondary)] truncate">{currentUser.name}</span>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
+            title="Sair"
+            aria-label="Sair"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>

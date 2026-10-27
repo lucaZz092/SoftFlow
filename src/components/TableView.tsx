@@ -18,21 +18,32 @@ import {
   Check,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
+import { TaskBadges } from './task/TaskBadges';
 import { TaskStatus, TaskPriority, CustomColumn, Task, Group } from '../types';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
-import { TEAM_MEMBERS } from '../data/mockData';
 import { Button } from './ui/Button';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { EmptyState } from './ui/EmptyState';
 
+/** Share of the task's timeline already elapsed (100 when done). */
+const timelineProgress = (timeline: { start: string; end: string }, done: boolean) => {
+  if (done) return 100;
+  const start = new Date(timeline.start).getTime();
+  const end = new Date(timeline.end).getTime();
+  if (!(end > start)) return 0;
+  return Math.round(Math.min(1, Math.max(0, (Date.now() - start) / (end - start))) * 100);
+};
+
 export const TableView: React.FC = () => {
   const {
+    members,
     tasks,
     groups,
     searchQuery,
     filterStatus,
     filterPriority,
     filterAssigneeId,
+    filterTagId,
     toggleGroupCollapse,
     addTask,
     updateTask,
@@ -41,8 +52,6 @@ export const TableView: React.FC = () => {
     changeTaskPriority,
     setSelectedTaskId,
     addGroup,
-    simulateClaudeRefine,
-    simulateCodexTestGeneration,
     customColumns,
     addCustomColumn,
     removeCustomColumn,
@@ -104,6 +113,7 @@ export const TableView: React.FC = () => {
     if (filterStatus && task.status !== filterStatus) return false;
     if (filterPriority && task.priority !== filterPriority) return false;
     if (filterAssigneeId && task.assignee?.id !== filterAssigneeId) return false;
+    if (filterTagId && !task.tags?.includes(filterTagId)) return false;
     return true;
   });
 
@@ -137,7 +147,7 @@ export const TableView: React.FC = () => {
     }));
   } else if (groupBy === 'assignee') {
     displayGroups = [
-      ...TEAM_MEMBERS.map((m) => ({
+      ...members.map((m) => ({
         id: `group-user-${m.id}`,
         title: m.name,
         color: m.color,
@@ -335,9 +345,6 @@ export const TableView: React.FC = () => {
                       {!hiddenColumns.includes('timeline') && (
                         <th className="w-36 px-3 py-2.5 text-center">Cronograma</th>
                       )}
-                      {!hiddenColumns.includes('integrations') && (
-                        <th className="w-36 px-3 py-2.5 text-center">Integrações (Git / IA)</th>
-                      )}
 
                       {/* Dynamic Custom Columns */}
                       {customColumns.map((col) => (
@@ -428,6 +435,8 @@ export const TableView: React.FC = () => {
                                 </span>
                               )}
 
+                              <TaskBadges task={task} className="shrink-0" />
+
                               {hasSubtasks && (
                                 <button
                                   type="button"
@@ -447,7 +456,7 @@ export const TableView: React.FC = () => {
                               type="button"
                               onClick={() => setSelectedTaskId(task.id)}
                               className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors relative cursor-pointer"
-                              title="Ver atualizações, logs de IA e comentários"
+                              title="Ver detalhes e comentários"
                               aria-label="Abrir detalhes da tarefa"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
@@ -485,7 +494,7 @@ export const TableView: React.FC = () => {
 
                               {activeAssigneePopover === task.id && (
                                 <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-52 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl p-1.5 z-40 space-y-0.5">
-                                  {TEAM_MEMBERS.map((m) => (
+                                  {members.map((m) => (
                                     <button
                                       type="button"
                                       key={m.id}
@@ -654,76 +663,11 @@ export const TableView: React.FC = () => {
                               <div className="w-28 mx-auto h-5 bg-[var(--bg-canvas)] rounded-full overflow-hidden flex items-center justify-center text-[10px] font-medium relative border border-[var(--border-subtle)]">
                                 <div
                                   className="absolute left-0 top-0 bottom-0 bg-[var(--accent-primary)] opacity-40"
-                                  style={{ width: task.status === 'Pronto' ? '100%' : '60%' }}
+                                  style={{ width: `${timelineProgress(task.timeline, task.status === 'Pronto')}%` }}
                                 />
                                 <span className="relative z-10 font-mono tabular-nums tracking-tight text-[10px] px-1 truncate text-[var(--text-primary)]">
                                   {task.timeline.start.slice(5)} - {task.timeline.end.slice(5)}
                                 </span>
-                              </div>
-                            </td>
-                          )}
-
-                          {/* Integrações */}
-                          {!hiddenColumns.includes('integrations') && (
-                            <td className="px-3 py-2.5 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {task.integrations.github ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedTaskId(task.id)}
-                                    className={`px-1.5 py-0.5 rounded-md text-[10px] flex items-center gap-1 cursor-pointer font-mono tabular-nums ${
-                                      task.integrations.github.prStatus === 'merged'
-                                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                    }`}
-                                    title={`PR #${task.integrations.github.prNumber || ''} (${task.integrations.github.prStatus || 'linked'})`}
-                                  >
-                                    <GitBranch className="w-3 h-3" />
-                                    <span>#{task.integrations.github.prNumber || 'repo'}</span>
-                                  </button>
-                                ) : null}
-
-                                {task.integrations.claude ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedTaskId(task.id)}
-                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-blue-500/10 text-[var(--accent-primary)] border border-blue-500/20 flex items-center gap-1 cursor-pointer font-medium"
-                                    title="Critérios de aceite gerados pelo Claude"
-                                  >
-                                    <Bot className="w-3 h-3" />
-                                    <span>Stories</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => simulateClaudeRefine(task.id)}
-                                    className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors p-1 cursor-pointer"
-                                    title="Refinar histórias com Claude"
-                                  >
-                                    <Bot className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-
-                                {task.integrations.codex ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedTaskId(task.id)}
-                                    className="px-1.5 py-0.5 rounded-md text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1 cursor-pointer font-medium"
-                                    title="Testes unitários gerados pelo Codex"
-                                  >
-                                    <Zap className="w-3 h-3" />
-                                    <span>Testes</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => simulateCodexTestGeneration(task.id)}
-                                    className="text-[var(--text-muted)] hover:text-amber-500 transition-colors p-1 cursor-pointer"
-                                    title="Gerar testes com Codex"
-                                  >
-                                    <Zap className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
                               </div>
                             </td>
                           )}
@@ -762,7 +706,7 @@ export const TableView: React.FC = () => {
                     {/* Inline + Adicionar tarefa row */}
                     <tr className="bg-[var(--bg-canvas)]/40 hover:bg-[var(--bg-canvas)] transition-colors">
                       <td className="px-3 py-2 text-center text-[var(--text-muted)]">+</td>
-                      <td colSpan={10 + customColumns.length} className="px-3 py-2">
+                      <td colSpan={9 + customColumns.length} className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <input
                             type="text"

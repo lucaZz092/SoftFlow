@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Workflow, GitBranch, Bot, Zap, Info } from 'lucide-react';
+import { X, Workflow, Info } from 'lucide-react';
 import { useProject, ToastMessage } from '../context/ProjectContext';
 
 export const Toasts: React.FC = () => {
@@ -8,12 +8,6 @@ export const Toasts: React.FC = () => {
 
   const getIcon = (type: ToastMessage['type']) => {
     switch (type) {
-      case 'github':
-        return <GitBranch className="w-4 h-4 text-purple-500" />;
-      case 'claude':
-        return <Bot className="w-4 h-4 text-indigo-500" />;
-      case 'codex':
-        return <Zap className="w-4 h-4 text-amber-500" />;
       case 'automation':
         return <Workflow className="w-4 h-4 text-emerald-500" />;
       default:
@@ -39,9 +33,22 @@ export const Toasts: React.FC = () => {
               <div className="min-w-0 pr-2">
                 <div className="font-semibold text-xs text-[var(--text-primary)]">{toast.title}</div>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-snug">{toast.description}</p>
-                <span className="text-[10px] text-[var(--text-muted)] font-mono tabular-nums mt-1 block">
-                  {toast.timestamp}
-                </span>
+                {toast.action ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.action!.onClick();
+                      dismissToast(toast.id);
+                    }}
+                    className="mt-1.5 text-xs font-medium text-[var(--accent-primary)] hover:underline cursor-pointer"
+                  >
+                    {toast.action.label}
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono tabular-nums mt-1 block">
+                    {toast.timestamp}
+                  </span>
+                )}
               </div>
             </div>
 

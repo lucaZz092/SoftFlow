@@ -5,9 +5,10 @@ import { PRIORITY_STYLES } from '../styles/designSystem';
 import { Button } from './ui/Button';
 import { TaskStatus } from '../types';
 
-// Reference current date in local system
-const TODAY = '2026-10-22';
-const TOMORROW = '2026-10-23';
+const localDate = (offsetDays = 0) => {
+  const d = new Date(Date.now() + offsetDays * 86400000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const IN_PROGRESS_STATUSES: TaskStatus[] = ['Em andamento', 'Trabalhando nisso', 'Em Revisão'];
 
@@ -20,7 +21,11 @@ export const OverviewView: React.FC = () => {
     addTask,
     changeTaskStatus,
     setFilterStatus,
+    currentUser,
   } = useProject();
+
+  const TODAY = localDate(0);
+  const TOMORROW = localDate(1);
 
   // Contextual greeting based on current local hour
   const greeting = useMemo(() => {
@@ -45,7 +50,7 @@ export const OverviewView: React.FC = () => {
     return tasks
       .filter((t) => {
         if (t.status === 'Pronto') return false;
-        const isAssignedToUser = t.assignee?.id === 'user-1';
+        const isAssignedToUser = t.assignee?.id === currentUser.id;
         const isUrgent = t.priority === 'Crítica' || t.priority === 'Alta';
         return isAssignedToUser || isUrgent || t.dueDate <= TOMORROW;
       })
@@ -100,9 +105,11 @@ export const OverviewView: React.FC = () => {
         {/* Greeting */}
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[13px] text-[var(--text-muted)]">Quinta-feira, 22 de outubro</p>
+            <p className="text-[13px] text-[var(--text-muted)] first-letter:uppercase">
+              {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
             <h2 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] mt-1">
-              {greeting}, Lucas
+              {greeting}, {currentUser.name.split(' ')[0]}
             </h2>
           </div>
           <Button variant="primary" size="sm" onClick={handleQuickCreateTask} leftIcon={<Plus className="w-3.5 h-3.5" />}>
