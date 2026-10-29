@@ -6,7 +6,12 @@ import { Button } from './ui/Button';
 
 export const LoginScreen: React.FC = () => {
   const { signInWithGithub } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  // A failed OAuth sign-in comes back with the error in the URL (query or hash)
+  const [error, setError] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search + '&' + window.location.hash.replace(/^#/, ''));
+    const description = params.get('error_description') || params.get('error');
+    return description ? `Falha no login: ${description.replace(/\+/g, ' ')}` : null;
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
