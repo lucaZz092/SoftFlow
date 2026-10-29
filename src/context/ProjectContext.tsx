@@ -168,11 +168,14 @@ interface ProjectContextType {
   clearTaskSelection: () => void;
   bulkDeleteTasks: () => void;
   bulkSetStatus: (status: TaskStatus) => void;
+  /** Adds the tag to every selected task, or removes it if they all have it already */
+  bulkToggleTag: (tagId: string) => void;
 
   // Groups
   toggleGroupCollapse: (groupId: string) => void;
   addGroup: (title: string, color?: string) => void;
   updateGroupTitle: (groupId: string, newTitle: string) => void;
+  updateGroupColor: (groupId: string, color: string) => void;
   deleteGroup: (groupId: string) => void;
 
   // Companies
@@ -438,6 +441,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
     showToast('Status Atualizado', `${selectedTaskIds.length} tarefas alteradas para "${status}".`, 'info');
     clearTaskSelection();
+  };
+
+  const bulkToggleTag = (tagId: string) => {
+    const selected = allTasks.filter((t) => selectedTaskIds.includes(t.id));
+    if (selected.length === 0) return;
+    if (selected.every((t) => t.tags?.includes(tagId))) {
+      const now = new Date().toISOString();
+      void setTasks((prev) =>
+        prev.map((t) =>
+          selectedTaskIds.includes(t.id) ? { ...t, tags: t.tags?.filter((id) => id !== tagId), updatedAt: now } : t
+        )
+      );
+    } else {
+      // One by one so each task fires its TAG_ADDED automations
+      selected.forEach((t) => addTaskTag(t.id, tagId));
+    }
   };
 
   // --- Automations (executed by AutomationEngine; this context only emits events and stores runs) ---
@@ -962,6 +981,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
+  const updateGroupColor = (groupId: string, color: string) => {
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, color } : g)));
+  };
+
   const deleteGroup = (groupId: string) => {
     const companyId = groups.find((g) => g.id === groupId)?.companyId;
     const remaining = groups.filter((g) => g.id !== groupId);
@@ -1150,9 +1173,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         clearTaskSelection,
         bulkDeleteTasks,
         bulkSetStatus,
+        bulkToggleTag,
         toggleGroupCollapse,
         addGroup,
         updateGroupTitle,
+        updateGroupColor,
         deleteGroup,
         toggleAutomation,
         addAutomation,

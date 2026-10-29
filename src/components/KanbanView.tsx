@@ -148,6 +148,7 @@ export const KanbanView: React.FC = () => {
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onDragEnd={() => setDraggedTaskId(null)}
                       onClick={() => setSelectedTaskId(task.id)}
+                      style={task.color ? { boxShadow: `inset 3px 0 0 ${task.color}` } : undefined}
                       className={`p-3.5 rounded-lg bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-all cursor-grab active:cursor-grabbing shadow-xs space-y-2.5 group ${
                         isBeingDragged ? 'opacity-40 scale-95 border-dashed border-[var(--accent-primary)]' : 'opacity-100'
                       }`}

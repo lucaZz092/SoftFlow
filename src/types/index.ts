@@ -51,6 +51,8 @@ export interface Task {
   customFields?: Record<string, string | number>;
   /** Tag ids (see Tag) */
   tags?: string[];
+  /** Highlight color shown on the task's row and card */
+  color?: string;
   /** When set, completing the task creates the next occurrence */
   recurrence?: Recurrence;
   /** Ids of tasks that must be done before this one */

@@ -9,6 +9,7 @@ import { Checkbox } from './ui/Checkbox';
 import { TaskDetailsTab } from './task/TaskDetailsTab';
 import { TaskTimeTab } from './task/TaskTimeTab';
 import { TaskAttachmentsTab } from './task/TaskAttachmentsTab';
+import { ColorDot, TagPicker } from './task/TagPicker';
 
 type DrawerTab = 'details' | 'comments' | 'subtasks' | 'time' | 'attachments';
 
@@ -202,6 +203,32 @@ export const TaskDetailDrawer: React.FC = () => {
                 onChange={(e) => updateTask(task.id, { dueDate: e.target.value })}
                 className="bg-[var(--bg-surface)] text-[var(--text-primary)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] text-xs outline-none focus:border-[var(--accent-primary)]"
               />
+            </div>
+
+            {/* Highlight color */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--text-muted)] text-[11px] font-medium">Cor:</span>
+              <ColorDot
+                size="md"
+                color={task.color ?? 'var(--border-strong)'}
+                onChange={(color) => updateTask(task.id, { color })}
+                label="Cor da demanda"
+              />
+              {task.color && (
+                <button
+                  type="button"
+                  onClick={() => updateTask(task.id, { color: undefined })}
+                  className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div className="w-full flex items-start gap-1.5">
+              <span className="text-[var(--text-muted)] text-[11px] font-medium pt-0.5">Etiquetas:</span>
+              <TagPicker task={task} />
             </div>
           </div>
 

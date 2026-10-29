@@ -16,9 +16,11 @@ import {
   ExternalLink,
   Layers,
   Check,
+  Tag as TagIcon,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { TaskBadges } from './task/TaskBadges';
+import { ColorDot, TagMenu } from './task/TagPicker';
 import { TaskStatus, TaskPriority, CustomColumn, Task, Group } from '../types';
 import { STATUS_STYLES, PRIORITY_STYLES } from '../styles/designSystem';
 import { Button } from './ui/Button';
@@ -66,10 +68,26 @@ export const TableView: React.FC = () => {
     clearTaskSelection,
     bulkDeleteTasks,
     bulkSetStatus,
+    bulkToggleTag,
+    allTasks,
+    updateGroupColor,
   } = useProject();
 
   const [newTaskTitles, setNewTaskTitles] = useState<Record<string, string>>({});
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [isBulkTagsOpen, setIsBulkTagsOpen] = useState(false);
+  const bulkTagsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isBulkTagsOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!bulkTagsRef.current?.contains(e.target as Node)) setIsBulkTagsOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isBulkTagsOpen]);
+  useEffect(() => {
+    if (selectedTaskIds.length === 0) setIsBulkTagsOpen(false);
+  }, [selectedTaskIds.length]);
   const [activeStatusPopover, setActiveStatusPopover] = useState<string | null>(null);
   const [activePriorityPopover, setActivePriorityPopover] = useState<string | null>(null);
   const [activeAssigneePopover, setActiveAssigneePopover] = useState<string | null>(null);
@@ -243,6 +261,27 @@ export const TableView: React.FC = () => {
               >
                 Em Andamento
               </Button>
+              <div className="relative" ref={bulkTagsRef}>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  leftIcon={<TagIcon className="w-3 h-3" />}
+                  onClick={() => setIsBulkTagsOpen(!isBulkTagsOpen)}
+                  aria-expanded={isBulkTagsOpen}
+                >
+                  Etiquetas
+                </Button>
+                {isBulkTagsOpen && (
+                    <TagMenu
+                      className="absolute z-20 bottom-full mb-2 left-0"
+                      isChecked={(tag) => {
+                        const selected = allTasks.filter((t) => selectedTaskIds.includes(t.id));
+                        return selected.length > 0 && selected.every((t) => t.tags?.includes(tag.id));
+                      }}
+                      onToggle={(tag) => bulkToggleTag(tag.id)}
+                    />
+                )}
+              </div>
               <Button
                 variant="danger"
                 size="xs"
@@ -291,6 +330,13 @@ export const TableView: React.FC = () => {
                 </button>
 
                 <div className="flex items-center gap-2">
+                  {groupBy === 'group' && (
+                    <ColorDot
+                      color={group.color}
+                      onChange={(color) => updateGroupColor(group.id, color)}
+                      label={`Cor da equipe ${group.title}`}
+                    />
+                  )}
                   <span className="font-bold text-sm tracking-tight" style={{ color: group.color }}>
                     {group.title}
                   </span>
@@ -391,8 +437,11 @@ export const TableView: React.FC = () => {
                             isSelected ? 'bg-blue-500/10' : ''
                           }`}
                         >
-                          {/* Checkbox */}
-                          <td className="px-3 py-2.5 text-center">
+                          {/* Checkbox (with the task's highlight color as a left stripe) */}
+                          <td
+                            className="px-3 py-2.5 text-center"
+                            style={task.color ? { boxShadow: `inset 3px 0 0 ${task.color}` } : undefined}
+                          >
                             <Checkbox
                               checked={isSelected}
                               onChange={() => toggleTaskSelection(task.id)}

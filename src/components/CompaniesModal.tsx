@@ -5,11 +5,11 @@ import { Company } from '../types';
 import { Modal, fieldClass } from './ui/Modal';
 import { Button } from './ui/Button';
 import { ConfirmDialog } from './ui/ConfirmDialog';
-import { TAG_COLORS } from './task/TagPicker';
+import { ColorDot, TAG_COLORS } from './task/TagPicker';
 
 /** Create, rename and delete companies, and choose which company each team belongs to */
 export const CompaniesModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { companies, allGroups, addCompany, updateCompany, deleteCompany, setGroupCompany } = useProject();
+  const { companies, allGroups, addCompany, updateCompany, deleteCompany, setGroupCompany, updateGroupColor } = useProject();
   const [newName, setNewName] = useState('');
   const [toDelete, setToDelete] = useState<Company | null>(null);
 
@@ -74,7 +74,7 @@ export const CompaniesModal: React.FC<{ onClose: () => void }> = ({ onClose }) =
             <h3 className="text-xs text-[var(--text-muted)]">Equipes</h3>
             {allGroups.map((g) => (
               <div key={g.id} className="flex items-center gap-3">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                <ColorDot color={g.color} onChange={(color) => updateGroupColor(g.id, color)} label={`Cor de ${g.title}`} />
                 <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--text-primary)]">{g.title}</span>
                 <select
                   value={g.companyId ?? ''}

@@ -6,7 +6,6 @@ import { api } from '../../lib/api';
 import { describeRecurrence } from '../../lib/recurrence';
 import { Recurrence, Task } from '../../types';
 import type { GithubLinkStatus } from '../../types/github';
-import { TagPicker } from './TagPicker';
 
 const fieldLabel = 'text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider';
 const selectClass =
@@ -91,10 +90,6 @@ export const TaskDetailsTab: React.FC<{ task: Task }> = ({ task }) => {
           className="w-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-2.5 py-2 text-[13px] text-[var(--text-primary)] outline-none resize-y leading-relaxed focus:border-[var(--accent-primary)]"
           placeholder="Contexto, objetivo, critérios…"
         />
-      </Field>
-
-      <Field label="Etiquetas">
-        <TagPicker task={task} />
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
