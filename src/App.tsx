@@ -11,6 +11,7 @@ import { OverviewView } from './components/OverviewView';
 import { CommandPalette } from './components/CommandPalette';
 import { Toasts } from './components/Toasts';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { AutomationEngine } from './components/AutomationEngine';
 
 // Views and heavy dialogs load on demand, keeping the first load small
 const named = <T extends Record<string, React.ComponentType>>(loader: () => Promise<T>, name: keyof T) =>
@@ -26,7 +27,6 @@ const BillingView = named(() => import('./components/billing/BillingView'), 'Bil
 const ArchiveView = named(() => import('./components/ArchiveView'), 'ArchiveView');
 const TaskDetailDrawer = named(() => import('./components/TaskDetailDrawer'), 'TaskDetailDrawer');
 const IntegrationsModal = named(() => import('./components/IntegrationsModal'), 'IntegrationsModal');
-const NewAutomationModal = named(() => import('./components/NewAutomationModal'), 'NewAutomationModal');
 
 const FullScreenLoader: React.FC = () => (
   <div className="h-screen flex items-center justify-center bg-[var(--bg-canvas)] text-[var(--text-muted)]">
@@ -58,7 +58,7 @@ const BlockerConfirm: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentView, isDataLoaded, syncError, selectedTaskId, isIntegrationsOpen, isNewAutomationOpen } = useProject();
+  const { currentView, isDataLoaded, syncError, selectedTaskId, isIntegrationsOpen } = useProject();
 
   if (!isDataLoaded) return <FullScreenLoader />;
 
@@ -103,8 +103,8 @@ const AppContent: React.FC = () => {
       <Suspense fallback={null}>
         {selectedTaskId && <TaskDetailDrawer />}
         {isIntegrationsOpen && <IntegrationsModal />}
-        {isNewAutomationOpen && <NewAutomationModal />}
       </Suspense>
+      <AutomationEngine />
       <CommandPalette />
       <BlockerConfirm />
       <Toasts />

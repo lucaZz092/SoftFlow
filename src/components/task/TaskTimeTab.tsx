@@ -56,7 +56,7 @@ export const TaskTimeTab: React.FC<{ task: Task }> = ({ task }) => {
           </div>
         </div>
         {isRunningHere ? (
-          <Button variant="secondary" size="sm" onClick={stopTimer} leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}>
+          <Button variant="secondary" size="sm" onClick={() => stopTimer()} leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}>
             Parar
           </Button>
         ) : (

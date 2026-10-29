@@ -4,7 +4,13 @@ Central de trabalho pessoal: demandas em quadro, kanban e cronograma, automaçõ
 
 ## Funcionalidades
 
-- **Demandas:** quadro (tabela), kanban, cronograma, sub-tarefas, comentários, colunas personalizadas e automações.
+- **Demandas:** quadro (tabela), kanban, cronograma, sub-tarefas, comentários e colunas personalizadas.
+- **Automações:** regras do tipo "Quando… se… então…".
+  - **Gatilhos de demanda:** mudança de status (inclusive mover no kanban), criação, prioridade, etiqueta, prazo vencido e cronômetro parado.
+  - **Gatilhos de fatura:** criada, paga ou vencida.
+  - **Ações:** mudar status ou prioridade, mover de grupo, etiquetar, atribuir, comentar, notificar no desktop, ligar ou desligar o cronômetro, arquivar, criar uma demanda de acompanhamento e criar um rascunho de fatura com as horas da demanda.
+  - **Comportamento:** uma regra pode disparar outra (até 3 níveis, sem laços). Toda execução fica no histórico, com o motivo quando falha. Há modelos prontos.
+  - **Limite:** as regras rodam no navegador com o app aberto, e os gatilhos por prazo são verificados a cada 5 minutos.
 - **Controle de tempo:** cronômetro por demanda (um por vez, visível no topo) e lançamento manual de horas.
 - **Recorrência:** diária, semanal ou mensal. Ao concluir, a próxima ocorrência é criada.
 - **Etiquetas:** coloridas, com filtro no quadro e no kanban.
@@ -31,7 +37,8 @@ Central de trabalho pessoal: demandas em quadro, kanban e cronograma, automaçõ
   - `POST /api/github/links`: estado dos PRs e issues vinculados às demandas.
   - `GET /api/status`: informa quais integrações têm credenciais configuradas.
 - **Banco** (`supabase/migrations/`): tabelas, RLS, lista de e-mails permitidos, bucket de anexos e publicação de tempo real.
-- **Lógica de domínio** (`src/lib/`): recorrência, tempo, faturamento e links do GitHub, em funções puras com testes (`npm test`).
+- **Lógica de domínio** (`src/lib/`): recorrência, tempo, faturamento, automações e links do GitHub, em funções puras com testes (`npm test`).
+- **Motor de automações** (`src/components/AutomationEngine.tsx`): os contextos de tarefas e de faturamento emitem eventos (`src/lib/automationEvents.ts`), e o motor aplica as regras. Ele tem testes de ponta a ponta com um Supabase em memória.
 
 ## Configuração
 

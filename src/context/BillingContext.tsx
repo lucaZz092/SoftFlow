@@ -4,6 +4,7 @@ import { useSyncedCollection } from '../lib/useSyncedCollection';
 import { linkInvoiceSources, nextInvoiceNumber } from '../lib/billing';
 import { localDate } from '../lib/dates';
 import { useProject } from './ProjectContext';
+import { AutomationChain, emitAutomationEvent } from '../lib/automationEvents';
 
 interface NewInvoice {
   clientId: string;
@@ -29,7 +30,9 @@ interface BillingContextType {
   updateProject: (id: string, updates: Partial<BillingProject>) => void;
   deleteProject: (id: string) => boolean;
 
-  createInvoice: (data: NewInvoice) => Invoice;
+  createInvoice: (data: NewInvoice, opts?: { chain?: AutomationChain }) => Invoice;
+  /** Remembers that a time-based automation fired for an invoice (see Invoice.automationRuns) */
+  markInvoiceAutomationRun: (invoiceId: string, workflowId: string, value: string) => void;
   setInvoiceStatus: (id: string, status: InvoiceStatus) => void;
   deleteInvoice: (id: string) => void;
 }
@@ -40,7 +43,7 @@ const byCreatedDesc = <T extends { createdAt: string }>(a: T, b: T) => b.created
 const byName = (a: Client, b: Client) => a.name.localeCompare(b.name, 'pt-BR');
 
 export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { allTasks, saveTasks } = useProject();
+  const { allTasks, setTimeEntriesInvoice } = useProject();
 
   const clientsSync = useSyncedCollection<Client>('clients', { enabled: true, sort: byName });
   const projectsSync = useSyncedCollection<BillingProject>('billing_projects', { enabled: true, sort: byCreatedDesc });
@@ -81,15 +84,22 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   /** Marks (or releases) the time entries and milestones an invoice bills */
   const linkSources = (items: InvoiceItem[], invoiceId: string | undefined) => {
-    const { changedTasks, changedProjects } = linkInvoiceSources(items, invoiceId, allTasks, projects);
-    if (changedTasks.length > 0) void saveTasks(changedTasks);
+    const { changedProjects } = linkInvoiceSources(items, invoiceId, allTasks, projects);
+    // Time entries are updated on the latest task state, so concurrent edits (e.g. a timer just stopped) aren't lost
+    const entryIdsByTask: Record<string, string[]> = {};
+    for (const item of items) {
+      if (item.source?.type === 'time') {
+        entryIdsByTask[item.source.taskId] = [...(entryIdsByTask[item.source.taskId] ?? []), ...item.source.entryIds];
+      }
+    }
+    if (Object.keys(entryIdsByTask).length > 0) void setTimeEntriesInvoice(entryIdsByTask, invoiceId);
     if (changedProjects.length > 0) {
       const byId = new Map(changedProjects.map((p) => [p.id, p]));
       void setProjects((prev) => prev.map((p) => byId.get(p.id) ?? p));
     }
   };
 
-  const createInvoice = (data: NewInvoice): Invoice => {
+  const createInvoice = (data: NewInvoice, opts?: { chain?: AutomationChain }): Invoice => {
     const invoice: Invoice = {
       id: 'inv-' + Date.now(),
       number: nextInvoiceNumber(invoices, Number(data.issueDate.slice(0, 4))),
@@ -102,18 +112,27 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       paidAt: data.status === 'paid' ? localDate() : undefined,
       createdAt: now(),
     };
-    void setInvoices((prev) => [invoice, ...prev]);
+    void setInvoices((prev) => [invoice, ...prev]).then(() => {
+      emitAutomationEvent({ type: 'INVOICE_CREATED', invoice, chain: opts?.chain });
+      if (invoice.status === 'paid') emitAutomationEvent({ type: 'INVOICE_PAID', invoice, chain: opts?.chain });
+    });
     linkSources(invoice.items, invoice.id);
     return invoice;
   };
+
+  const markInvoiceAutomationRun = (invoiceId: string, workflowId: string, value: string) =>
+    void setInvoices((prev) =>
+      prev.map((i) => (i.id === invoiceId ? { ...i, automationRuns: { ...i.automationRuns, [workflowId]: value } } : i))
+    );
 
   const setInvoiceStatus = (id: string, status: InvoiceStatus) => {
     const invoice = invoices.find((i) => i.id === id);
     // Cancelled is final: its hours may already be on another invoice, so reopening could bill them twice
     if (!invoice || invoice.status === status || invoice.status === 'cancelled') return;
-    void setInvoices((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, status, paidAt: status === 'paid' ? localDate() : undefined } : i))
-    );
+    const updated = { ...invoice, status, paidAt: status === 'paid' ? localDate() : undefined };
+    void setInvoices((prev) => prev.map((i) => (i.id === id ? updated : i))).then(() => {
+      if (status === 'paid') emitAutomationEvent({ type: 'INVOICE_PAID', invoice: updated });
+    });
     // A cancelled invoice gives its hours and milestones back so they can be billed again
     if (status === 'cancelled') linkSources(invoice.items, undefined);
   };
@@ -140,6 +159,7 @@ export const BillingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateProject,
         deleteProject,
         createInvoice,
+        markInvoiceAutomationRun,
         setInvoiceStatus,
         deleteInvoice,
       }}

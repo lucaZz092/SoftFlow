@@ -20,7 +20,8 @@ import { toAssignee, useAuth } from './AuthContext';
 import { localDate } from '../lib/dates';
 import { nextOccurrence } from '../lib/recurrence';
 import { parseGithubLink } from '../lib/githubLinks';
-import { findRunningEntry } from '../lib/time';
+import { entryMinutes, findRunningEntry } from '../lib/time';
+import { AutomationChain, emitAutomationEvent } from '../lib/automationEvents';
 
 export interface ToastMessage {
   id: string;
@@ -69,7 +70,6 @@ interface ProjectContextType {
   confirmPendingStatusChange: () => void;
   cancelPendingStatusChange: () => void;
   isIntegrationsOpen: boolean;
-  isNewAutomationOpen: boolean;
 
   // Custom Columns & Display Preferences
   customColumns: CustomColumn[];
@@ -93,24 +93,26 @@ interface ProjectContextType {
   setFilterAssigneeId: (id: string | null) => void;
   setFilterTagId: (id: string | null) => void;
   setIsIntegrationsOpen: (open: boolean) => void;
-  setIsNewAutomationOpen: (open: boolean) => void;
   setSortBy: (sort: { field: SortField; direction: 'asc' | 'desc' } | null) => void;
   setGroupBy: (option: GroupByOption) => void;
   toggleColumnVisibility: (colId: string) => void;
 
   // Tasks CRUD
-  addTask: (groupId: string, title?: string) => Task;
+  addTask: (groupId: string, title?: string, opts?: { dueDate?: string; status?: TaskStatus; chain?: AutomationChain }) => Task;
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => void;
-  changeTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+  /** With `chain` (automation-initiated) the blocker confirmation is skipped */
+  changeTaskStatus: (taskId: string, newStatus: TaskStatus, opts?: { chain?: AutomationChain }) => void;
   moveTaskToStatus: (taskId: string, newStatus: TaskStatus) => void;
-  changeTaskPriority: (taskId: string, newPriority: TaskPriority) => void;
+  changeTaskPriority: (taskId: string, newPriority: TaskPriority, opts?: { chain?: AutomationChain }) => void;
   changeTaskGroup: (taskId: string, newGroupId: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   addSubtask: (taskId: string, title: string) => void;
   addComment: (taskId: string, text: string, isSystem?: boolean) => void;
-  /** Upserts whole task objects (used by billing to mark time entries as invoiced) */
+  /** Upserts whole task objects */
   saveTasks: (changed: Task[]) => Promise<void>;
+  /** Sets (or clears, with undefined) the invoice on specific time entries, on the latest task state */
+  setTimeEntriesInvoice: (entryIdsByTask: Record<string, string[]>, invoiceId: string | undefined) => Promise<void>;
 
   // Archive
   archiveTask: (taskId: string) => void;
@@ -122,6 +124,8 @@ interface ProjectContextType {
   updateTag: (tagId: string, updates: Partial<Tag>) => void;
   deleteTag: (tagId: string) => void;
   toggleTaskTag: (taskId: string, tagId: string) => void;
+  /** Adds a tag if missing (idempotent) */
+  addTaskTag: (taskId: string, tagId: string, opts?: { chain?: AutomationChain }) => void;
 
   // Recurrence & dependencies
   setRecurrence: (taskId: string, recurrence: Recurrence | undefined) => void;
@@ -130,8 +134,8 @@ interface ProjectContextType {
 
   // Time tracking
   runningTimer: { taskId: string; start: string } | null;
-  startTimer: (taskId: string) => void;
-  stopTimer: () => void;
+  startTimer: (taskId: string, opts?: { chain?: AutomationChain }) => void;
+  stopTimer: (opts?: { chain?: AutomationChain }) => void;
   addTimeEntry: (taskId: string, entry: { date: string; minutes: number; note?: string }) => void;
   deleteTimeEntry: (taskId: string, entryId: string) => void;
 
@@ -165,11 +169,24 @@ interface ProjectContextType {
   // Automations
   toggleAutomation: (workflowId: string) => void;
   addAutomation: (workflow: Omit<AutomationWorkflow, 'id' | 'executionCount' | 'lastRunAt'>) => void;
+  updateAutomation: (workflowId: string, workflow: Omit<AutomationWorkflow, 'id' | 'executionCount' | 'lastRunAt'>) => void;
+  /** Logs an automation run and bumps its counters */
+  recordAutomationRun: (
+    workflow: AutomationWorkflow,
+    subject: { id: string; title: string },
+    details: string,
+    status?: AutomationRunLog['status']
+  ) => void;
+  /** Remembers that a time-based automation fired for a task (see Task.automationRuns) */
+  markTaskAutomationRun: (taskId: string, workflowId: string, value: string) => void;
   deleteAutomation: (workflowId: string) => void;
-  triggerManualAutomation: (workflowId: string, targetTaskId?: string) => void;
+  /** Runs an automation now on the given task */
+  triggerManualAutomation: (workflowId: string, taskId: string) => void;
 
   // Toast
   dismissToast: (id: string) => void;
+  /** Short informational toast (used by the automation engine) */
+  notify: (title: string, description: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -240,7 +257,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [pendingStatusChange, setPendingStatusChange] = useState<PendingStatusChange | null>(null);
 
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
-  const [isNewAutomationOpen, setIsNewAutomationOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('softflow_theme', theme);
@@ -372,84 +388,60 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     clearTaskSelection();
   };
 
-  // --- Automations (client-side events) ---
+  // --- Automations (executed by AutomationEngine; this context only emits events and stores runs) ---
 
-  const recordRunLog = (workflow: AutomationWorkflow, task: Task, details: string) => {
+  const recordAutomationRun = (
+    workflow: AutomationWorkflow,
+    subject: { id: string; title: string },
+    details: string,
+    status: AutomationRunLog['status'] = 'success'
+  ) => {
     const now = new Date();
     const newLog: AutomationRunLog = {
       id: `log-${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
       workflowId: workflow.id,
       workflowName: workflow.name,
-      taskId: task.id,
-      taskTitle: task.title,
+      taskId: subject.id,
+      taskTitle: subject.title,
       timestamp: formatTimestamp(now),
-      status: 'success',
+      status,
       details,
     };
-    setRunLogs((prev) => [newLog, ...prev]);
-
-    setAutomations((prev) =>
+    void setRunLogs((prev) => [newLog, ...prev]);
+    void setAutomations((prev) =>
       prev.map((a) =>
-        a.id === workflow.id
-          ? { ...a, executionCount: a.executionCount + 1, lastRunAt: formatTimestamp(now) }
-          : a
+        a.id === workflow.id ? { ...a, executionCount: a.executionCount + 1, lastRunAt: formatTimestamp(now) } : a
       )
     );
   };
 
-  /** Applies one automation's action to a task and logs the run. */
-  const runAutomationAction = (auto: AutomationWorkflow, task: Task) => {
-    switch (auto.action.type) {
-      case 'NOTIFY_TEAM':
-        addComment(task.id, `Automação "${auto.name}": demanda sinalizada.`, true);
-        recordRunLog(auto, task, 'Alerta registrado na demanda.');
-        showToast('Alerta de Fluxo', `Demanda "${task.title}" escalada para a equipe.`, 'info');
-        break;
-      case 'SET_STATUS':
-      case 'MOVE_TO_GROUP': {
-        const updates: Partial<Task> = {};
-        if (auto.action.targetStatus) updates.status = auto.action.targetStatus;
-        if (auto.action.targetGroupId && groups.some((g) => g.id === auto.action.targetGroupId)) {
-          updates.groupId = auto.action.targetGroupId;
-        }
-        updateTask(task.id, updates);
-        recordRunLog(auto, task, `Ação "${auto.action.label}" aplicada.`);
-        showToast('Fluxo Executado', `Automação "${auto.name}" aplicada a "${task.title}".`, 'automation');
-        break;
-      }
-      default:
-        break;
-    }
-  };
-
-  const executeAutomationsForEvent = (
-    triggerType: 'STATUS_CHANGE' | 'TASK_CREATED' | 'PRIORITY_SET_CRITICAL',
-    task: Task
-  ) => {
-    automations.forEach((auto) => {
-      if (!auto.enabled || auto.trigger.type !== triggerType) return;
-      if (triggerType === 'STATUS_CHANGE' && auto.trigger.targetStatus && task.status !== auto.trigger.targetStatus) return;
-      if (auto.condition?.field === 'groupId' && task.groupId !== auto.condition.value) return;
-      runAutomationAction(auto, task);
-    });
-  };
+  const markTaskAutomationRun = (taskId: string, workflowId: string, value: string) =>
+    void setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, automationRuns: { ...t.automationRuns, [workflowId]: value } } : t
+      )
+    );
 
   // --- Tasks ---
 
-  const addTask = (groupId: string, title?: string): Task => {
+  const addTask = (
+    groupId: string,
+    title?: string,
+    opts?: { dueDate?: string; status?: TaskStatus; chain?: AutomationChain }
+  ): Task => {
     const now = new Date().toISOString();
     const newTask: Task = {
       id: 'task-' + Date.now(),
       groupId,
       title: title || 'Nova Demanda',
       description: '',
-      status: 'A Fazer',
+      status: opts?.status ?? 'A Fazer',
       priority: 'Média',
       assignee: currentUser,
-      dueDate: localDate(3),
+      dueDate: opts?.dueDate ?? localDate(3),
       timeline: {
         start: localDate(0),
-        end: localDate(3),
+        end: opts?.dueDate ?? localDate(3),
       },
       subtasks: [],
       comments: [],
@@ -458,7 +450,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updatedAt: now,
     };
 
-    void setTasks((prev) => [newTask, ...prev]).then(() => executeAutomationsForEvent('TASK_CREATED', newTask));
+    void setTasks((prev) => [newTask, ...prev]).then(() =>
+      emitAutomationEvent({ type: 'TASK_CREATED', task: newTask, chain: opts?.chain })
+    );
 
     return newTask;
   };
@@ -473,6 +467,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const byId = new Map(changed.map((t) => [t.id, t]));
     return setTasks((prev) => prev.map((t) => byId.get(t.id) ?? t));
   };
+
+  const setTimeEntriesInvoice = (entryIdsByTask: Record<string, string[]>, invoiceId: string | undefined) =>
+    setTasks((prev) =>
+      prev.map((t) => {
+        const ids = entryIdsByTask[t.id];
+        if (!ids) return t;
+        return { ...t, timeEntries: (t.timeEntries ?? []).map((e) => (ids.includes(e.id) ? { ...e, invoiceId } : e)) };
+      })
+    );
 
   // Attachment files of deleted tasks are only removed once the undo window has passed
   const pendingDeletions = useRef(new Map<string, number>());
@@ -516,7 +519,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .map((id) => allTasks.find((t) => t.id === id))
       .filter((t): t is Task => Boolean(t) && t!.status !== 'Pronto');
 
-  const applyStatusChange = (task: Task, newStatus: TaskStatus) => {
+  const applyStatusChange = (task: Task, newStatus: TaskStatus, chain?: AutomationChain) => {
     const updated = { ...task, status: newStatus, updatedAt: new Date().toISOString() };
 
     // Completing a recurring task schedules the next one; the recurrence moves to the new task
@@ -529,14 +532,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void setTasks((prev) => {
       const list = prev.map((t) => (t.id === task.id ? updated : t));
       return next ? [next, ...list] : list;
-    }).then(() => executeAutomationsForEvent('STATUS_CHANGE', updated));
+    }).then(() => emitAutomationEvent({ type: 'STATUS_CHANGE', task: updated, from: task.status, chain }));
 
     if (next) showToast('Próxima ocorrência criada', `"${next.title}" agendada para ${next.dueDate.split('-').reverse().join('/')}.`, 'info');
   };
 
-  const changeTaskStatus = (taskId: string, newStatus: TaskStatus) => {
+  const changeTaskStatus = (taskId: string, newStatus: TaskStatus, opts?: { chain?: AutomationChain }) => {
     const task = allTasks.find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
+    if (opts?.chain) {
+      applyStatusChange(task, newStatus, opts.chain);
+      return;
+    }
 
     const blockers = newStatus === 'Pronto' ? openBlockers(task) : [];
     if (blockers.length > 0) {
@@ -605,15 +612,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (filterTagId === tagId) setFilterTagId(null);
   };
 
-  const toggleTaskTag = (taskId: string, tagId: string) =>
-    void setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== taskId) return t;
-        const current = t.tags ?? [];
-        const next = current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId];
-        return { ...t, tags: next, updatedAt: new Date().toISOString() };
-      })
+  const setTaskTags = (taskId: string, tags: string[]) =>
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, tags, updatedAt: new Date().toISOString() } : t)));
+
+  const toggleTaskTag = (taskId: string, tagId: string) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.tags?.includes(tagId)) {
+      void setTaskTags(taskId, task.tags.filter((id) => id !== tagId));
+    } else {
+      addTaskTag(taskId, tagId);
+    }
+  };
+
+  const addTaskTag = (taskId: string, tagId: string, opts?: { chain?: AutomationChain }) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (!task || task.tags?.includes(tagId)) return;
+    const tags = [...(task.tags ?? []), tagId];
+    void setTaskTags(taskId, tags).then(() =>
+      emitAutomationEvent({ type: 'TAG_ADDED', task: { ...task, tags }, tagId, chain: opts?.chain })
     );
+  };
 
   // --- Recurrence & dependencies ---
 
@@ -664,8 +683,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         : t
     );
 
+  /** TIMER_STOPPED for the entry that was running before `now` (if any) */
+  const emitTimerStopped = (now: string, chain?: AutomationChain) => {
+    const r = findRunningEntry(allTasks);
+    if (!r) return;
+    const closed = { ...r.entry, end: now };
+    emitAutomationEvent({
+      type: 'TIMER_STOPPED',
+      task: { ...r.task, timeEntries: (r.task.timeEntries ?? []).map((e) => (e.id === closed.id ? closed : e)) },
+      minutes: entryMinutes(closed),
+      chain,
+    });
+  };
+
   // Starting a timer stops the previous one in the same update, so only one runs at a time
-  const startTimer = (taskId: string) => {
+  const startTimer = (taskId: string, opts?: { chain?: AutomationChain }) => {
+    if (runningTimer?.taskId === taskId) return;
     const now = new Date().toISOString();
     void setTasks((prev) =>
       withTimerStopped(prev, now).map((t) =>
@@ -673,10 +706,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ? { ...t, timeEntries: [...(t.timeEntries ?? []), { id: 'time-' + Date.now(), start: now, end: null }], updatedAt: now }
           : t
       )
-    );
+    ).then(() => emitTimerStopped(now, opts?.chain));
   };
 
-  const stopTimer = () => void setTasks((prev) => withTimerStopped(prev, new Date().toISOString()));
+  const stopTimer = (opts?: { chain?: AutomationChain }) => {
+    if (!runningTimer) return;
+    const now = new Date().toISOString();
+    void setTasks((prev) => withTimerStopped(prev, now)).then(() => emitTimerStopped(now, opts?.chain));
+  };
 
   const addTimeEntry = (taskId: string, entry: { date: string; minutes: number; note?: string }) => {
     // Manual entries start at noon of the chosen day so the date never shifts across timezones
@@ -784,15 +821,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     changeTaskStatus(taskId, newStatus);
   };
 
-  const changeTaskPriority = (taskId: string, newPriority: TaskPriority) => {
-    const task = tasks.find((t) => t.id === taskId);
+  const changeTaskPriority = (taskId: string, newPriority: TaskPriority, opts?: { chain?: AutomationChain }) => {
+    const task = allTasks.find((t) => t.id === taskId);
     if (!task || task.priority === newPriority) return;
 
-    void updateTask(taskId, { priority: newPriority }).then(() => {
-      if (newPriority === 'Crítica') {
-        executeAutomationsForEvent('PRIORITY_SET_CRITICAL', { ...task, priority: newPriority });
-      }
-    });
+    void updateTask(taskId, { priority: newPriority }).then(() =>
+      emitAutomationEvent({
+        type: 'PRIORITY_CHANGE',
+        task: { ...task, priority: newPriority },
+        from: task.priority,
+        chain: opts?.chain,
+      })
+    );
   };
 
   const changeTaskGroup = (taskId: string, newGroupId: string) => {
@@ -902,7 +942,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       lastRunAt: 'Nunca executado',
     };
     setAutomations((prev) => [newAuto, ...prev]);
-    showToast('Novo Fluxo Criado', `Automação "${newAuto.name}" adicionada e ativa.`, 'automation');
+    showToast('Automação criada', `"${newAuto.name}" está ${newAuto.enabled ? 'ativa' : 'pausada'}.`, 'automation');
+  };
+
+  const updateAutomation = (
+    workflowId: string,
+    workflowData: Omit<AutomationWorkflow, 'id' | 'executionCount' | 'lastRunAt'>
+  ) => {
+    setAutomations((prev) => prev.map((a) => (a.id === workflowId ? { ...a, ...workflowData } : a)));
+    showToast('Automação salva', `"${workflowData.name}" foi atualizada.`, 'automation');
   };
 
   const deleteAutomation = (workflowId: string) => {
@@ -910,18 +958,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast('Fluxo Excluído', 'A automação foi removida.', 'info');
   };
 
-  /** Runs an automation's action right now on a task (the most recent one if none is given). */
-  const triggerManualAutomation = (workflowId: string, targetTaskId?: string) => {
-    const wf = automations.find((a) => a.id === workflowId);
-    if (!wf) return;
-
-    const task = targetTaskId ? allTasks.find((t) => t.id === targetTaskId) : tasks[0];
-    if (!task) {
-      showToast('Nenhuma demanda', 'Crie uma demanda para executar a automação.', 'info');
-      return;
-    }
-    runAutomationAction(wf, task);
-  };
+  const triggerManualAutomation = (workflowId: string, taskId: string) =>
+    emitAutomationEvent({ type: 'MANUAL', automationId: workflowId, taskId });
 
   return (
     <ProjectContext.Provider
@@ -955,7 +993,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         confirmPendingStatusChange,
         cancelPendingStatusChange,
         isIntegrationsOpen,
-        isNewAutomationOpen,
         customColumns,
         hiddenColumns,
         sortBy,
@@ -969,7 +1006,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setFilterAssigneeId,
         setFilterTagId,
         setIsIntegrationsOpen,
-        setIsNewAutomationOpen,
         setSortBy,
         setGroupBy,
         toggleColumnVisibility,
@@ -984,6 +1020,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addSubtask,
         addComment,
         saveTasks,
+        setTimeEntriesInvoice,
         archiveTask,
         unarchiveTask,
         archiveCompleted,
@@ -991,6 +1028,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateTag,
         deleteTag,
         toggleTaskTag,
+        addTaskTag,
         setRecurrence,
         addBlocker,
         removeBlocker,
@@ -1018,9 +1056,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteGroup,
         toggleAutomation,
         addAutomation,
+        updateAutomation,
+        recordAutomationRun,
+        markTaskAutomationRun,
         deleteAutomation,
         triggerManualAutomation,
         dismissToast,
+        notify: (title: string, description: string) => showToast(title, description, 'automation'),
       }}
     >
       {children}

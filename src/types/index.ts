@@ -62,6 +62,8 @@ export interface Task {
   /** Client whose hourly rate applies to this task's time (billing) */
   clientId?: string;
   archivedAt?: string;
+  /** Time-based automations already fired for this task: automation id -> the value they fired for (e.g. the due date) */
+  automationRuns?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -153,6 +155,8 @@ export interface Invoice {
   items: InvoiceItem[];
   paidAt?: string;
   notes?: string;
+  /** Time-based automations already fired for this invoice (automation id -> due date) */
+  automationRuns?: Record<string, string>;
   createdAt: string;
 }
 
@@ -174,13 +178,32 @@ export interface Board {
 export type AutomationTriggerType =
   | 'STATUS_CHANGE'
   | 'TASK_CREATED'
-  | 'PRIORITY_SET_CRITICAL';
+  | 'PRIORITY_CHANGE'
+  /** Legacy: same as PRIORITY_CHANGE to "Crítica" */
+  | 'PRIORITY_SET_CRITICAL'
+  | 'TAG_ADDED'
+  | 'TASK_OVERDUE'
+  | 'TIMER_STOPPED'
+  | 'INVOICE_CREATED'
+  | 'INVOICE_PAID'
+  | 'INVOICE_OVERDUE';
 
 export type AutomationActionType =
   | 'SET_STATUS'
+  | 'SET_PRIORITY'
   | 'MOVE_TO_GROUP'
+  | 'ADD_TAG'
   | 'ASSIGN_USER'
-  | 'NOTIFY_TEAM';
+  | 'ADD_COMMENT'
+  /** Desktop notification + comment on the task */
+  | 'NOTIFY_TEAM'
+  | 'START_TIMER'
+  | 'STOP_TIMER'
+  | 'ARCHIVE_TASK'
+  | 'CREATE_TASK'
+  | 'CREATE_INVOICE_DRAFT';
+
+export type AutomationConditionField = 'groupId' | 'priority' | 'tag' | 'clientId' | 'hasClient';
 
 export interface AutomationWorkflow {
   id: string;
@@ -191,9 +214,11 @@ export interface AutomationWorkflow {
     type: AutomationTriggerType;
     label: string;
     targetStatus?: TaskStatus;
+    targetPriority?: TaskPriority;
+    tagId?: string;
   };
   condition?: {
-    field: string;
+    field: AutomationConditionField | string;
     operator: 'equals' | 'is';
     value: string;
     label: string;
@@ -203,6 +228,14 @@ export interface AutomationWorkflow {
     label: string;
     targetStatus?: TaskStatus;
     targetGroupId?: string;
+    targetPriority?: TaskPriority;
+    tagId?: string;
+    /** Member id for ASSIGN_USER; "me" means whoever is signed in */
+    assigneeId?: string;
+    /** Comment/notification text or new task title; supports {demanda}, {fatura}, {cliente} */
+    text?: string;
+    /** CREATE_TASK: due date offset in days */
+    dueInDays?: number;
   };
   executionCount: number;
   lastRunAt?: string;

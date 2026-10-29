@@ -22,7 +22,15 @@ export const KanbanView: React.FC = () => {
     moveTaskToStatus,
     setSelectedTaskId,
     addTask,
+    automations,
+    setCurrentView,
   } = useProject();
+
+  // Enabled rules that fire when a card lands in each column
+  const columnAutomations = (status: TaskStatus) =>
+    automations.filter(
+      (a) => a.enabled && a.trigger.type === 'STATUS_CHANGE' && (!a.trigger.targetStatus || a.trigger.targetStatus === status)
+    );
 
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
@@ -97,13 +105,26 @@ export const KanbanView: React.FC = () => {
                   <span className="text-[11px] font-mono tabular-nums text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
                     {colTasks.length}
                   </span>
+                  {columnAutomations(colStatus).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView('automations')}
+                      className="inline-flex items-center gap-0.5 text-[11px] tabular-nums text-[var(--accent-primary)] hover:underline cursor-pointer"
+                      title={`Ao soltar aqui: ${columnAutomations(colStatus)
+                        .map((a) => a.name)
+                        .join(', ')}`}
+                      aria-label={`${columnAutomations(colStatus).length} automações nesta coluna`}
+                    >
+                      <Zap className="w-3 h-3" />
+                      {columnAutomations(colStatus).length}
+                    </button>
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={() => {
-                    const task = addTask(groups[0]?.id || 'group-marketing', 'Nova Demanda');
-                    moveTaskToStatus(task.id, colStatus);
+                    addTask(groups[0]?.id || 'group-marketing', 'Nova Demanda', { status: colStatus });
                   }}
                   className="p-1 rounded-md hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                   title="Nova demanda nesta coluna"

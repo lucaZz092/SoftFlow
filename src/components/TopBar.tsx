@@ -39,7 +39,7 @@ const TimerPill: React.FC = () => {
       <span className="text-[13px] tabular-nums text-[var(--text-primary)] px-1">{formatClock(elapsed)}</span>
       <button
         type="button"
-        onClick={stopTimer}
+        onClick={() => stopTimer()}
         className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
         title="Parar cronômetro"
         aria-label="Parar cronômetro"
