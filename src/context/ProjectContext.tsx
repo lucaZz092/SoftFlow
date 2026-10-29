@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import {
   Task,
   Group,
+  Company,
   Assignee,
   AutomationWorkflow,
   AutomationRunLog,
@@ -43,13 +44,21 @@ export type SortField = 'dueDate' | 'priority' | 'title';
 export type GroupByOption = 'group' | 'status' | 'assignee';
 
 interface ProjectContextType {
-  /** Active (non-archived) tasks */
+  /** Active (non-archived) tasks of the selected company */
   tasks: Task[];
+  /** Archived tasks of the selected company */
   archivedTasks: Task[];
-  /** Every task, archived included */
+  /** Every task of every company, archived included */
   allTasks: Task[];
   tags: Tag[];
+  /** Teams of the selected company */
   groups: Group[];
+  /** Teams of every company */
+  allGroups: Group[];
+  companies: Company[];
+  /** null = every company */
+  selectedCompanyId: string | null;
+  setSelectedCompanyId: (id: string | null) => void;
   automations: AutomationWorkflow[];
   runLogs: AutomationRunLog[];
   isDataLoaded: boolean;
@@ -166,6 +175,13 @@ interface ProjectContextType {
   updateGroupTitle: (groupId: string, newTitle: string) => void;
   deleteGroup: (groupId: string) => void;
 
+  // Companies
+  addCompany: (name: string, color: string) => Company;
+  updateCompany: (companyId: string, updates: Partial<Company>) => void;
+  /** Removes the company; its teams stay, without a company */
+  deleteCompany: (companyId: string) => void;
+  setGroupCompany: (groupId: string, companyId: string | undefined) => void;
+
   // Automations
   toggleAutomation: (workflowId: string) => void;
   addAutomation: (workflow: Omit<AutomationWorkflow, 'id' | 'executionCount' | 'lastRunAt'>) => void;
@@ -211,19 +227,55 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const runLogsSync = useSyncedCollection<AutomationRunLog>('run_logs', { enabled, sort: byIdDesc, limit: 100 });
   const columnsSync = useSyncedCollection<CustomColumn>('custom_columns', { enabled, seed: DEFAULT_CUSTOM_COLUMNS });
   const tagsSync = useSyncedCollection<Tag>('tags', { enabled });
+  const companiesSync = useSyncedCollection<Company>('companies', { enabled });
 
   const { items: allTasks, setItems: setTasks } = tasksSync;
   const { items: tags, setItems: setTags } = tagsSync;
   const tasks = React.useMemo(() => allTasks.filter((t) => !t.archivedAt), [allTasks]);
   const archivedTasks = React.useMemo(() => allTasks.filter((t) => t.archivedAt), [allTasks]);
   const { items: groups, setItems: setGroups } = groupsSync;
+  const { items: companies, setItems: setCompanies } = companiesSync;
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(() =>
+    localStorage.getItem('softflow_company')
+  );
+  useEffect(() => {
+    if (selectedCompanyId) localStorage.setItem('softflow_company', selectedCompanyId);
+    else localStorage.removeItem('softflow_company');
+  }, [selectedCompanyId]);
+  // Fall back to every company if the selected one was deleted (here or elsewhere)
+  useEffect(() => {
+    if (companiesSync.loaded && selectedCompanyId && !companies.some((c) => c.id === selectedCompanyId)) {
+      setSelectedCompanyId(null);
+    }
+  }, [companiesSync.loaded, companies, selectedCompanyId]);
+
+  const visibleGroups = React.useMemo(
+    () => (selectedCompanyId ? groups.filter((g) => g.companyId === selectedCompanyId) : groups),
+    [groups, selectedCompanyId]
+  );
+  const visibleGroupIds = React.useMemo(() => new Set(visibleGroups.map((g) => g.id)), [visibleGroups]);
+  const visibleTasks = React.useMemo(
+    () => (selectedCompanyId ? tasks.filter((t) => visibleGroupIds.has(t.groupId)) : tasks),
+    [tasks, selectedCompanyId, visibleGroupIds]
+  );
+  const visibleArchivedTasks = React.useMemo(
+    () => (selectedCompanyId ? archivedTasks.filter((t) => visibleGroupIds.has(t.groupId)) : archivedTasks),
+    [archivedTasks, selectedCompanyId, visibleGroupIds]
+  );
   const { items: automations, setItems: setAutomations } = automationsSync;
   const { items: runLogs, setItems: setRunLogs } = runLogsSync;
   const { items: customColumns, setItems: setCustomColumns } = columnsSync;
 
   const isDataLoaded = tasksSync.loaded && groupsSync.loaded && automationsSync.loaded;
   const syncError =
-    tasksSync.error || groupsSync.error || automationsSync.error || runLogsSync.error || columnsSync.error || tagsSync.error;
+    tasksSync.error ||
+    groupsSync.error ||
+    automationsSync.error ||
+    runLogsSync.error ||
+    columnsSync.error ||
+    tagsSync.error ||
+    companiesSync.error;
 
   const [members, setMembers] = useState<Assignee[]>([]);
 
@@ -579,7 +631,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const archiveCompleted = () => {
-    const done = tasks.filter((t) => t.status === 'Pronto').map((t) => t.id);
+    const done = visibleTasks.filter((t) => t.status === 'Pronto').map((t) => t.id);
     if (done.length === 0) {
       showToast('Nada para arquivar', 'Não há demandas concluídas no quadro.', 'info');
       return;
@@ -898,6 +950,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       title,
       color,
       collapsed: false,
+      ...(selectedCompanyId ? { companyId: selectedCompanyId } : {}),
     };
     setGroups((prev) => [...prev, newGroup]);
     showToast('Novo Grupo Criado', `Grupo "${title}" adicionado ao quadro.`, 'info');
@@ -910,14 +963,53 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteGroup = (groupId: string) => {
+    const companyId = groups.find((g) => g.id === groupId)?.companyId;
     const remaining = groups.filter((g) => g.id !== groupId);
-    if (remaining.length > 0) {
+    // Prefer a team of the same company for the orphaned tasks
+    const fallback = remaining.find((g) => g.companyId === companyId) ?? remaining[0];
+    if (fallback) {
       setTasks((prev) =>
-        prev.map((t) => (t.groupId === groupId ? { ...t, groupId: remaining[0].id } : t))
+        prev.map((t) => (t.groupId === groupId ? { ...t, groupId: fallback.id } : t))
       );
     }
     setGroups(remaining);
     showToast('Grupo Removido', 'O grupo e suas associações foram atualizados.', 'info');
+  };
+
+  // --- Companies ---
+
+  const addCompany = (name: string, color: string) => {
+    const company: Company = { id: 'company-' + Date.now(), name: name.trim(), color, createdAt: new Date().toISOString() };
+    setCompanies((prev) => [...prev, company]);
+    showToast('Empresa criada', `"${company.name}" foi adicionada.`, 'info');
+    return company;
+  };
+
+  const updateCompany = (companyId: string, updates: Partial<Company>) => {
+    setCompanies((prev) => prev.map((c) => (c.id === companyId ? { ...c, ...updates } : c)));
+  };
+
+  const deleteCompany = (companyId: string) => {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.companyId !== companyId) return g;
+        const { companyId: _removed, ...rest } = g;
+        return rest;
+      })
+    );
+    setCompanies((prev) => prev.filter((c) => c.id !== companyId));
+    if (selectedCompanyId === companyId) setSelectedCompanyId(null);
+    showToast('Empresa removida', 'As equipes dela ficaram sem empresa.', 'info');
+  };
+
+  const setGroupCompany = (groupId: string, companyId: string | undefined) => {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g;
+        const { companyId: _old, ...rest } = g;
+        return companyId ? { ...rest, companyId } : rest;
+      })
+    );
   };
 
   // --- Automation management ---
@@ -968,11 +1060,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toggleTheme,
         isMobileSidebarOpen,
         setIsMobileSidebarOpen,
-        tasks,
-        archivedTasks,
+        tasks: visibleTasks,
+        archivedTasks: visibleArchivedTasks,
         allTasks,
         tags,
-        groups,
+        groups: visibleGroups,
+        allGroups: groups,
+        companies,
+        selectedCompanyId,
+        setSelectedCompanyId,
+        addCompany,
+        updateCompany,
+        deleteCompany,
+        setGroupCompany,
         automations,
         runLogs,
         isDataLoaded,

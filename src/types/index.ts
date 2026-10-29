@@ -160,11 +160,22 @@ export interface Invoice {
   createdAt: string;
 }
 
+/** Company that owns teams (groups); the sidebar switcher scopes the board to one company */
+export interface Company {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
+/** A team on the board */
 export interface Group {
   id: string;
   title: string;
   color: string;
   collapsed: boolean;
+  /** Company this team belongs to; unset teams show only under "Todas as empresas" */
+  companyId?: string;
 }
 
 export interface Board {

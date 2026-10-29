@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Compass,
   LayoutList,
@@ -14,10 +14,14 @@ import {
   Github,
   Receipt,
   Archive,
+  Building2,
+  Settings2,
 } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
 import { ViewType } from '../types';
+import { CompaniesModal } from './CompaniesModal';
+import { fieldClass } from './ui/Modal';
 
 const NAV_ITEMS: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: 'overview', label: 'Início', icon: Compass },
@@ -41,8 +45,12 @@ export const NavigationSidebar: React.FC = () => {
     theme,
     toggleTheme,
     currentUser,
+    companies,
+    selectedCompanyId,
+    setSelectedCompanyId,
   } = useProject();
   const { signOut } = useAuth();
+  const [isCompaniesOpen, setIsCompaniesOpen] = useState(false);
 
   const handleNavClick = (view: ViewType) => {
     setCurrentView(view);
@@ -77,6 +85,35 @@ export const NavigationSidebar: React.FC = () => {
           aria-label="Fechar menu"
         >
           <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Company switcher */}
+      <div className="px-2 pb-2 flex items-center gap-1">
+        <div className="relative flex-1 min-w-0">
+          <Building2 className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+          <select
+            value={selectedCompanyId ?? ''}
+            onChange={(e) => setSelectedCompanyId(e.target.value || null)}
+            className={`${fieldClass} !pl-7 cursor-pointer truncate`}
+            aria-label="Empresa"
+          >
+            <option value="">Todas as empresas</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsCompaniesOpen(true)}
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
+          title="Gerenciar empresas e equipes"
+          aria-label="Gerenciar empresas e equipes"
+        >
+          <Settings2 className="w-4 h-4" />
         </button>
       </div>
 
@@ -142,6 +179,7 @@ export const NavigationSidebar: React.FC = () => {
 
   return (
     <>
+      {isCompaniesOpen && <CompaniesModal onClose={() => setIsCompaniesOpen(false)} />}
       {/* Desktop Persistent Sidebar */}
       <aside className="hidden md:flex h-screen z-20 shrink-0">{sidebarContent}</aside>
 

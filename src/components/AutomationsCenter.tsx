@@ -67,7 +67,7 @@ const RunOnTask: React.FC<{ auto: AutomationWorkflow }> = ({ auto }) => {
 };
 
 export const AutomationsCenter: React.FC = () => {
-  const { automations, runLogs, groups, tags, members, toggleAutomation, deleteAutomation, addAutomation, updateAutomation, addTag } =
+  const { automations, runLogs, allGroups: groups, tags, members, toggleAutomation, deleteAutomation, addAutomation, updateAutomation, addTag } =
     useProject();
   const { clients } = useBilling();
   const names = { groups, tags, clients, members };

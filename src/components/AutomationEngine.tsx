@@ -58,7 +58,7 @@ export const AutomationEngine: React.FC = () => {
     const fill = (text: string) => fillTemplate(text, { task, invoice, client });
 
     if (a.type === 'CREATE_TASK') {
-      const groupId = task?.groupId ?? p.groups[0]?.id;
+      const groupId = task?.groupId ?? p.allGroups[0]?.id;
       if (!groupId) throw new ActionError('Nenhum grupo para criar a demanda.');
       const title = fill(a.text?.trim() || 'Acompanhar {demanda}') || 'Acompanhamento';
       const created = p.addTask(groupId, title, { dueDate: addDays(localDate(), a.dueInDays ?? 1), chain });
@@ -78,7 +78,7 @@ export const AutomationEngine: React.FC = () => {
         p.changeTaskPriority(task.id, a.targetPriority, { chain });
         return `Prioridade de "${task.title}" → ${a.targetPriority}.`;
       case 'MOVE_TO_GROUP': {
-        const group = p.groups.find((g) => g.id === a.targetGroupId);
+        const group = p.allGroups.find((g) => g.id === a.targetGroupId);
         if (!group) throw new ActionError('O grupo de destino não existe mais.');
         void p.updateTask(task.id, { groupId: group.id });
         return `"${task.title}" movida para ${group.title}.`;

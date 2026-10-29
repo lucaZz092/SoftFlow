@@ -38,7 +38,7 @@ export const AutomationEditor: React.FC<{
   onSave: (draft: AutomationDraft) => void;
   onClose: () => void;
 }> = ({ initial, title, onSave, onClose }) => {
-  const { groups, tags, members } = useProject();
+  const { allGroups: groups, tags, members } = useProject();
   const { clients } = useBilling();
   const [draft, setDraft] = useState<AutomationDraft>(() =>
     // Legacy trigger is edited as its modern equivalent

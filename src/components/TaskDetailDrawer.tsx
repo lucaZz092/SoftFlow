@@ -16,7 +16,7 @@ export const TaskDetailDrawer: React.FC = () => {
   const {
     members,
     allTasks,
-    groups,
+    allGroups: groups,
     selectedTaskId,
     setSelectedTaskId,
     updateTask,
